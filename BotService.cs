@@ -36,7 +36,7 @@ public class BotService
     {
         RegisterCommands();
         RegisterEventHandler();
-
+        Console.WriteLine($"Today is: {DateOnly.FromDateTime(DateTime.Now)}");
         _discord.GuildDownloadCompleted += async (s, e) =>
         {            
             try

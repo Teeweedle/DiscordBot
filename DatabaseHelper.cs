@@ -41,4 +41,29 @@ public class DatabaseHelper
 
         lCmd.ExecuteNonQuery();
     }
+    public List<MessageRecord> GetMoD()
+    {
+        using var lConnection = new SqliteConnection(_connectionString);
+        lConnection.Open();
+        List<MessageRecord> lMessages = new List<MessageRecord>();
+
+        string lSql = @"SELECT * FROM Messages
+                        WHERE date(Timestamp) = $date
+                        and LENGTH(Content > 3)
+                        and content NOT LIKE '%/%'
+                        and content NOT LIKE '%!%')";
+        using var lcmd = new SqliteCommand(lSql, lConnection);
+        lcmd.Parameters.AddWithValue("$date", DateTime.Today);
+
+        using var lReader = lcmd.ExecuteReader();
+        while (lReader.Read())
+        {
+            lMessages.Add(new MessageRecord
+            {
+                MessageID = lReader.GetString(0)
+            });
+        }
+
+        return lMessages;
+    }
 }
