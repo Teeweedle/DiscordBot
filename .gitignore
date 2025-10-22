@@ -1,0 +1,44 @@
+# Build results
+[Bb]in/
+[Oo]bj/
+out/
+
+# User-specific files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Visual Studio Code settings
+.vscode/
+.history/
+.idea/
+
+# Logs and temporary files
+*.log
+*.tlog
+*.tmp
+*.temp
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# NuGet packages
+*.nupkg
+packages/
+# if you have package restore turned on:
+**/packages/*/
+!**/packages/build/
+
+# SQLite or other databases
+*.db
+*.db-shm
+*.db-wal
+
+# Environment variables or secrets
+.env
+appsettings.Development.json
+
+# Publish output
+/publish/
