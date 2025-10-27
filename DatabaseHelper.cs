@@ -1,3 +1,4 @@
+using DSharpPlus.Entities;
 using Microsoft.Data.Sqlite;
 public class DatabaseHelper
 {
@@ -17,31 +18,37 @@ public class DatabaseHelper
             ChannelID TEXT,
             AuthorID TEXT,
             Content TEXT,
+            AttachmentCount INTEGER,
             Timestamp TEXT
         )";
         using var createCmd = new SqliteCommand(lTableCmd, lConnection);
         createCmd.ExecuteNonQuery();
     }
 
-    public void SaveMessage(string aMessageID, string aChannelID, string aAuthorID, string aContent, DateTime aTimeStamp)
+    public void SaveMessage(DiscordMessage aMessage)
     {
         using var lConnection = new SqliteConnection(_connectionString);
         lConnection.Open();
 
         string lInsertCmd = @"INSERT OR IGNORE INTO Messages
-            (MessageID, ChannelID, AuthorID, Content, Timestamp)
-            VALUES ($id, $channel, $author, $content, $time)";
+            (MessageID, ChannelID, AuthorID, Content, AttachmentCount, Timestamp)
+            VALUES ($MessageID, $ChannelID, $AuthorID, $Content, $AttachmentCount, $Timestamp)";
 
         using var lCmd = new SqliteCommand(lInsertCmd, lConnection);
-        lCmd.Parameters.AddWithValue("$id", aMessageID);
-        lCmd.Parameters.AddWithValue("$channel", aChannelID);
-        lCmd.Parameters.AddWithValue("$author", aAuthorID);
-        lCmd.Parameters.AddWithValue("$content", aContent);
-        lCmd.Parameters.AddWithValue("$time", aTimeStamp);
+        lCmd.Parameters.AddWithValue("$MessageID", aMessage.Id.ToString());
+        lCmd.Parameters.AddWithValue("$ChannelID", aMessage.Channel.Id.ToString());
+        lCmd.Parameters.AddWithValue("$AuthorID", aMessage.Author.Id.ToString());
+        lCmd.Parameters.AddWithValue("$Content", aMessage.Content);
+        lCmd.Parameters.AddWithValue("$AttachmentCount", aMessage.Attachments.Count);
+        lCmd.Parameters.AddWithValue("$Timestamp", aMessage.CreationTimestamp.UtcDateTime.ToString("o"));
 
         lCmd.ExecuteNonQuery();
     }
-    public List<MessageRecord> GetMoD()
+    /// <summary>
+    /// Returns all messages from the database that share today's date
+    /// </summary>
+    /// <returns>List of MessageRecords</returns>
+    public List<MessageRecord> GetTodaysMsgs()
     {
         using var lConnection = new SqliteConnection(_connectionString);
         lConnection.Open();
@@ -60,7 +67,13 @@ public class DatabaseHelper
         {
             lMessages.Add(new MessageRecord
             {
-                MessageID = lReader.GetString(0)
+                MessageID = lReader.GetOrdinal("MessageID").ToString(),
+                ChannelID = lReader.GetOrdinal("ChannelID").ToString(),
+                AuthorID = lReader.GetOrdinal("AuthorID").ToString(),
+                Content = lReader.GetOrdinal("Content").ToString(),
+                AttachmentCount = Convert.ToInt32(lReader.GetOrdinal("AttachmentCount")),
+                Timestamp = DateTime.Parse(lReader.GetString(lReader.GetOrdinal("Timestamp"))),
+                Interestingness = 0
             });
         }
 

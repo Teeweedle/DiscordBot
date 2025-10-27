@@ -6,7 +6,7 @@ public class BotService
 {
     private readonly string _token;
     private readonly DiscordClient _discord;
-    private readonly DatabaseHelper _db = new();
+    private readonly DatabaseHelper _dbh = new();
 
     public BotService(string aToken)
     {
@@ -31,14 +31,14 @@ public class BotService
                SaveMessage(e.Message);
        };
     }
-    
+
     public async Task RunAsync()
     {
         RegisterCommands();
         RegisterEventHandler();
         Console.WriteLine($"Today is: {DateOnly.FromDateTime(DateTime.Now)}");
         _discord.GuildDownloadCompleted += async (s, e) =>
-        {            
+        {
             try
             {
                 Console.WriteLine("Bot is connected and ready.");
@@ -58,16 +58,13 @@ public class BotService
         // Keep the program running
         await Task.Delay(-1);
     }
-    //TODO: Move to DBHelper
+    /// <summary>
+    /// Calls DatabaseHelper.SaveMessage
+    /// </summary>
+    /// <param name="aMessage">A DiscordMessage</param>
     private void SaveMessage(DiscordMessage aMessage)
     {
-        _db.SaveMessage(
-            aMessage.Id.ToString(),
-            aMessage.Channel.Id.ToString(),
-            aMessage.Author.Id.ToString(),
-            aMessage.Content,
-            aMessage.CreationTimestamp.UtcDateTime
-        );
+        _dbh.SaveMessage(aMessage);
     }
     private async Task ScrapeChannelAsync(DiscordChannel aChannel)
     {
