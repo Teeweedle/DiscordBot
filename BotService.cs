@@ -7,6 +7,7 @@ public class BotService
     private readonly string _token;
     private readonly DiscordClient _discord;
     private readonly DatabaseHelper _dbh = new();
+    private readonly ulong BotTestChannelID = 1428046909737533480;
 
     public BotService(string aToken)
     {
@@ -94,18 +95,37 @@ public class BotService
     }
     private async Task ScrapeAllGuilds(DiscordClient aDiscord)
     {
-        foreach(var guild in aDiscord.Guilds.Values)
+        foreach (var guild in aDiscord.Guilds.Values)
         {
             Console.WriteLine($"Channel Count: {guild.Channels.Count}");
             Console.WriteLine($"{guild.Name}");
-            foreach(var channel in guild.Channels.Values)
+            foreach (var channel in guild.Channels.Values)
             {
-                if(channel.Type == ChannelType.Text)
+                if (channel.Type == ChannelType.Text)
                 {
                     Console.WriteLine($"Scraping #{channel.Name} in {guild.Name}...");
                     await ScrapeChannelAsync(channel);
                 }
             }
+        }
+    }
+    public async Task PostMOTDAsync()
+    {
+        var MOTDService = new OnThisDayService();
+        var lBestMsg = MOTDService.GetMOD(DateTime.UtcNow.Date);
+
+        if (lBestMsg != null)
+        {
+            DiscordChannel lChannel = await _discord.GetChannelAsync(BotTestChannelID);
+
+            if(lChannel is DiscordChannel)
+            {
+                string lMessageURL = $"https://discord.com/channels/{lBestMsg.GuildID}/{lBestMsg.ChannelID}/{lBestMsg.MessageID}";
+                string lMessageText = $"** On this day in {lBestMsg.Timestamp.Year} **\n" +
+                                        $"[view message]({lMessageURL})";
+
+                await lChannel.SendMessageAsync(lMessageText);    
+            }            
         }
     }
 }

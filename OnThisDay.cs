@@ -14,9 +14,12 @@ public class OnThisDay
     @"<@!?(\d+)>",
     RegexOptions.IgnoreCase | RegexOptions.Compiled
     );
-    private readonly DatabaseHelper _dbh = new();
     private List<MessageRecord> _messages = new List<MessageRecord>();
-    public OnThisDay(List<MessageRecord> aMessages) => _messages = aMessages.ToList();
+    /// <summary>
+    /// Constructor, accepts a list of MessageRecords to process
+    /// </summary>
+    /// <param name="aMessages">A list of MessageRecords</param>
+    public OnThisDay(List<MessageRecord> aMessages) => _messages = aMessages;
     public void GenerateInterestingness()
     {
         float lInterestingness;
