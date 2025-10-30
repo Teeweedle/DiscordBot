@@ -7,13 +7,18 @@ public class OnThisDay
     private const float WordCountMultiplier = 0.5f;
     private const float MentionsUserMultiplier = 0.5f;
     private static readonly Regex MediaLinkRegex = new Regex(
-    @"https?:\/\/[^\s]+?\.(?:gif|mp3|mp4|png|jpg|jpeg|webm)",
-    RegexOptions.IgnoreCase | RegexOptions.Compiled
+        @"https?:\/\/[^\s]+?\.(?:gif|mp3|mp4|png|jpg|jpeg|webm)",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled
     );
     private static readonly Regex MentionsUserRegex = new Regex(
-    @"<@!?(\d+)>",
-    RegexOptions.IgnoreCase | RegexOptions.Compiled
+        @"<@!?(\d+)>",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled
     );
+    public static readonly Regex WordCountRegex = new Regex(
+        @"(?<!\S)(?!https?://|www\.|<@\d+>)[a-zA-Z]+(?:'[a-zA-Z]+)?(?!\.\w{2,6})(?!\S)",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled
+    );
+   
     private List<MessageRecord> _messages = new List<MessageRecord>();
     /// <summary>
     /// Constructor, accepts a list of MessageRecords to process
@@ -34,13 +39,13 @@ public class OnThisDay
     }
     public float ContentWordCount(string aContent)
     {
-        int lWordCount = Regex.Matches(aContent, @"\b[\w'-]+\b").Count;
+        int lWordCount = WordCountRegex.Matches(aContent ?? string.Empty).Count;
         return lWordCount * WordCountMultiplier;
     }
     public float HasAttachment(int aAttachmentCount, string aContent)
     {
-        int lAttachmentCount = MediaLinkRegex.Matches(aContent ?? string.Empty).Count;
-        return (aAttachmentCount + lAttachmentCount) * AttachmentMultiplier;
+        int lLinkCount = MediaLinkRegex.Matches(aContent ?? string.Empty).Count;
+        return (aAttachmentCount + lLinkCount) * AttachmentMultiplier;
     }
     public float MentionsUser(string aContent){
         int lMentions = MentionsUserRegex.Matches(aContent ?? string.Empty).Count;
