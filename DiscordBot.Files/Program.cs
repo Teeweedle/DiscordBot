@@ -1,7 +1,8 @@
-﻿
-class Program
-{    static async Task Main(string[] args)
+﻿class Program
+{    
+    public static async Task Main(string[] args)
     {
+        Console.Write("Bot is starting... ");
         //for testing
         var MOTDService = new OnThisDayService();
         var today = DateTime.UtcNow.Date;
@@ -18,4 +19,3 @@ class Program
         //await bot.PostMOTDAsync();
     }    
 }
-

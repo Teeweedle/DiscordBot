@@ -112,7 +112,8 @@ public class BotService
     public async Task PostMOTDAsync()
     {
         var MOTDService = new OnThisDayService();
-        var lBestMsg = MOTDService.GetMOD(DateTime.UtcNow.Date);
+        List<MessageRecord> lMessages = _dbh.GetTodaysMsgs(DateTime.UtcNow.Date);
+        var lBestMsg = MOTDService.GetMotD(lMessages);
 
         if (lBestMsg != null)
         {
