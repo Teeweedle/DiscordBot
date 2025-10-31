@@ -2,8 +2,8 @@
 {    
     public static async Task Main(string[] args)
     {
-        Console.Write("Bot is starting... ");
-        //for testing
+        Console.WriteLine("Bot is starting... ");
+
         var MOTDService = new OnThisDayService();
         var today = DateTime.UtcNow.Date;
 
@@ -13,9 +13,12 @@
 
         var bot = new BotService(token);
 
+        if (args.Length > 0 && args[0].Equals("postmotd", StringComparison.OrdinalIgnoreCase))
+        {
+            await bot.PostMotDAsync();
+            return;
+        }
+
         await bot.RunAsync();
-        
-        //for testing
-        //await bot.PostMOTDAsync();
     }    
 }

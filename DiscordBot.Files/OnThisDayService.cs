@@ -13,8 +13,9 @@ public class OnThisDayService
         var lBestMsg = aMessages
             .OrderByDescending(m => m.Interestingness)
             .FirstOrDefault();
-        Console.WriteLine($"*****Best Interestingness message: {lBestMsg!.Interestingness} \n" + 
-                            $"The message is - {lBestMsg.Content}*****");
+        Console.WriteLine($"Best Interestingness message - {lBestMsg!.Interestingness} \n" +
+                            $"The message is - {lBestMsg.Content}\n" +
+                            $"The attachment count is - {lBestMsg.AttachmentCount}");
         return lBestMsg;
     }
 }

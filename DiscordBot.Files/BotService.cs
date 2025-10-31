@@ -109,8 +109,9 @@ public class BotService
             }
         }
     }
-    public async Task PostMOTDAsync()
+    public async Task PostMotDAsync()
     {
+        Console.WriteLine("Posting MOTD...");
         var MOTDService = new OnThisDayService();
         List<MessageRecord> lMessages = _dbh.GetTodaysMsgs(DateTime.UtcNow.Date);
         var lBestMsg = MOTDService.GetMotD(lMessages);
@@ -122,10 +123,13 @@ public class BotService
             if(lChannel is DiscordChannel)
             {
                 string lMessageURL = $"https://discord.com/channels/{lBestMsg.GuildID}/{lBestMsg.ChannelID}/{lBestMsg.MessageID}";
-                string lMessageText = $"** On this day in {lBestMsg.Timestamp.Year} **\n" +
-                                        $"[view message]({lMessageURL})";
+                var lmsgBuilder = new DiscordMessageBuilder().
+                    WithContent($"**On this day in {lBestMsg.Timestamp.Year} -- <@{lBestMsg.AuthorID}> said: **\n\n" +
+                        $"{lBestMsg.Content}\n\n" +
+                        $"[view orignal message]({lMessageURL})")
+                        .WithAllowedMentions(Mentions.None);               
 
-                await lChannel.SendMessageAsync(lMessageText);    
+                await lChannel.SendMessageAsync(lmsgBuilder);    
             }            
         }
     }

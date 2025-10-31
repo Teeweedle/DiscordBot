@@ -31,7 +31,7 @@ public class DatabaseHelper
         using var lConnection = new SqliteConnection(_connectionString);
         lConnection.Open();
 
-        string lInsertCmd = @"INSERT OR IGNORE INTO Messages
+        string lInsertCmd = @"INSERT OR REPLACE INTO Messages
             (MessageID, GuildID, ChannelID, AuthorID, Content, AttachmentCount, Timestamp)
             VALUES ($MessageID, $GuildID, $ChannelID, $AuthorID, $Content, $AttachmentCount, $Timestamp)";
 
@@ -42,7 +42,7 @@ public class DatabaseHelper
         lCmd.Parameters.AddWithValue("$AuthorID", aMessage.Author.Id.ToString());
         lCmd.Parameters.AddWithValue("$Content", aMessage.Content);
         lCmd.Parameters.AddWithValue("$AttachmentCount", aMessage.Attachments.Count);
-        lCmd.Parameters.AddWithValue("$Timestamp", aMessage.CreationTimestamp.UtcDateTime.ToString("o"));
+        lCmd.Parameters.AddWithValue("$Timestamp", aMessage.CreationTimestamp.ToString("o"));
 
         lCmd.ExecuteNonQuery();
     }
@@ -58,11 +58,16 @@ public class DatabaseHelper
 
         //select all messages from today (m/d) and any year but this year
         string lSql = @"SELECT * FROM Messages
-                        WHERE strftime('%m-%d', Timestamp) = strftime('%m-%d', $date)
-                        AND strftime('%Y', Timestamp) != strftime('%Y', 'now')
-                        AND LENGTH(Content) > 3
-                        AND content NOT LIKE '%/%'
-                        AND content NOT LIKE '%!%'";
+                            WHERE strftime('%m-%d', Timestamp) = strftime('%m-%d', $date)
+                            AND strftime('%Y', Timestamp) = (
+                                    SELECT strftime('%Y', Timestamp)
+                                    FROM Messages
+                                    WHERE strftime('%m-%d', Timestamp) = strftime('%m-%d', $date)
+                                    AND strftime('%Y', Timestamp) != strftime('%Y', 'now')
+                                    ORDER BY RANDOM()
+                                    LIMIT 1
+                                )
+                            AND LENGTH(Content) > 3";
         using var lcmd = new SqliteCommand(lSql, lConnection);
         lcmd.Parameters.AddWithValue("$date", aDate.ToString("yyyy-MM-dd"));
 

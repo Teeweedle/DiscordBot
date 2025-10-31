@@ -47,8 +47,8 @@ public class OnThisDayServiceTests
                 Interestingness = 0
             },
             new MessageRecord {
-                Content = "Multiple attachments here https://site.com/a.mp3 and https://site.com/b.mp4",
-                AttachmentCount = 2,
+                Content = "Multiple attachments here https://www.youtube.com/watch?v=4LBjSXWQRV8 and https://youtu.be/yV1gVEdMPaA",
+                AttachmentCount = 1,
                 Timestamp = DateTime.UtcNow,
                 MessageID = "5",
                 GuildID = "1",
@@ -63,8 +63,10 @@ public class OnThisDayServiceTests
     {  
         var lService = new OnThisDayService();
         var lMessage = lService.GetMotD(_messages!);
-        Console.WriteLine(lMessage!.Content);  
-        Assert.That(lMessage!.Content, Is.EqualTo("Multiple attachments here https://site.com/a.mp3 and https://site.com/b.mp4"));  
+        TestContext.WriteLine($"Best Interestingness message - {lMessage!.Interestingness} \n" +
+                            $"The message is - {lMessage.Content}\n" +
+                            $"The attachment count is - {lMessage.AttachmentCount}"); 
+        Assert.That(lMessage!.Content, Is.EqualTo("Multiple attachments here https://www.youtube.com/watch?v=4LBjSXWQRV8 and https://youtu.be/yV1gVEdMPaA"));  
     }
 } 
 
