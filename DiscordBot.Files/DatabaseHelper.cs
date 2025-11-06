@@ -20,20 +20,34 @@ public class DatabaseHelper
             AuthorID TEXT,
             Content TEXT,
             AttachmentCount INTEGER,
+            ReactionCount INTEGER,
             Timestamp TEXT
         )";
         using var createCmd = new SqliteCommand(lTableCmd, lConnection);
         createCmd.ExecuteNonQuery();
     }
+    public string? GetWeightedChannelID(string aGuildID)
+    {
+        using var lConnection = new SqliteConnection(_connectionString);
+        lConnection.Open();
 
+        string lSql = @"
+            SELECT WeightedChannelID FROM WeightedChannels WHERE GuildID = $GuildID LIMIT 1";
+            
+        using var lCmd = new SqliteCommand(lSql, lConnection);
+        lCmd.Parameters.AddWithValue("$GuildID", aGuildID);
+        
+        var result = lCmd.ExecuteScalar();
+        return result?.ToString();          
+    }
     public void SaveMessage(DiscordMessage aMessage)
     {
         using var lConnection = new SqliteConnection(_connectionString);
         lConnection.Open();
 
         string lInsertCmd = @"INSERT OR REPLACE INTO Messages
-            (MessageID, GuildID, ChannelID, AuthorID, Content, AttachmentCount, Timestamp)
-            VALUES ($MessageID, $GuildID, $ChannelID, $AuthorID, $Content, $AttachmentCount, $Timestamp)";
+            (MessageID, GuildID, ChannelID, AuthorID, Content, AttachmentCount, ReactionCount, Timestamp)
+            VALUES ($MessageID, $GuildID, $ChannelID, $AuthorID, $Content, $AttachmentCount, $ReactionCount, $Timestamp)";
 
         using var lCmd = new SqliteCommand(lInsertCmd, lConnection);
         lCmd.Parameters.AddWithValue("$MessageID", aMessage.Id.ToString());
@@ -42,6 +56,7 @@ public class DatabaseHelper
         lCmd.Parameters.AddWithValue("$AuthorID", aMessage.Author.Id.ToString());
         lCmd.Parameters.AddWithValue("$Content", aMessage.Content);
         lCmd.Parameters.AddWithValue("$AttachmentCount", aMessage.Attachments.Count);
+        lCmd.Parameters.AddWithValue("$ReactionCount", aMessage.Reactions.Count);
         lCmd.Parameters.AddWithValue("$Timestamp", aMessage.CreationTimestamp.ToString("o"));
 
         lCmd.ExecuteNonQuery();
@@ -82,6 +97,7 @@ public class DatabaseHelper
                 AuthorID = lReader.GetString(lReader.GetOrdinal("AuthorID")),
                 Content = lReader.GetString(lReader.GetOrdinal("Content")),
                 AttachmentCount = lReader.GetInt32(lReader.GetOrdinal("AttachmentCount")),
+                ReactionCount = lReader.GetInt32(lReader.GetOrdinal("ReactionCount")),
                 Timestamp = DateTime.Parse(lReader.GetString(lReader.GetOrdinal("Timestamp"))),
                 Interestingness = 0
             });

@@ -1,6 +1,8 @@
 public class OnThisDayServiceTests
 {
     private List<MessageRecord>? _messages;
+    private readonly string GuildID = 196270419748192256.ToString();
+    private DatabaseHelper _dbh = new DatabaseHelper();
     [SetUp]
     public void Setup()
     {
@@ -60,9 +62,10 @@ public class OnThisDayServiceTests
     }
     [Test]  
     public void PostMotD_ReturnsMessageWithHighestInterestingness()  
-    {  
+    {
         var lService = new OnThisDayService();
-        var lMessage = lService.GetMotD(_messages!);
+        var lWeightedChannelID = _dbh.GetWeightedChannelID(GuildID) ?? "";//Hardcoded guildID from my server
+        var lMessage = lService.GetMotD(_messages!, lWeightedChannelID);
         TestContext.WriteLine($"Best Interestingness message - {lMessage!.Interestingness} \n" +
                             $"The message is - {lMessage.Content}\n" +
                             $"The attachment count is - {lMessage.AttachmentCount}"); 

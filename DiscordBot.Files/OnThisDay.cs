@@ -1,4 +1,3 @@
-
 using System.Text.RegularExpressions;
 
 public class OnThisDay
@@ -6,6 +5,8 @@ public class OnThisDay
     private const float AttachmentMultiplier = 3.5f;
     private const float WordCountMultiplier = 0.35f;
     private const float MentionsUserMultiplier = 0.3f;
+    private const float ReactionCountMultiplier = 0.25f;
+    private const float weightedChannelMultiplier = 1.5f;    
     private static readonly Regex MediaLinkRegex = new Regex(
         @"https?:\/\/(?:[^\s]+?\.(?:gif|mp3|mp4|png|jpg|jpeg|webm)|(?:www\.)?(?:reddit\.com|v\.redd\.it|imgur\.com|gfycat\.com|tenor\.com|youtube\.com|youtu\.be)[^\s]*)",
         RegexOptions.IgnoreCase | RegexOptions.Compiled
@@ -26,16 +27,18 @@ public class OnThisDay
     /// </summary>
     /// <param name="aMessages">A list of MessageRecords</param>
     public OnThisDay(List<MessageRecord> aMessages) => _messages = aMessages;
-    public void GenerateInterestingness()
+    public void GenerateInterestingness(string? aWeightedChannelID)
     {
-        float lInterestingness;
-        foreach (var message in _messages)
+        foreach (var m in _messages)
         {
-            lInterestingness = 0.0f;
-            lInterestingness += ContentWordCount(message.Content);
-            lInterestingness += HasAttachment(message.AttachmentCount, message.Content);
-            lInterestingness += MentionsUser(message.Content);
-            message.Interestingness = lInterestingness;
+            m.Interestingness =
+                ContentWordCount(m.Content) +
+                HasAttachment(m.AttachmentCount, m.Content) +
+                ReactionCount(m.ReactionCount) +
+                MentionsUser(m.Content);
+
+            if(aWeightedChannelID != null && m.ChannelID == aWeightedChannelID) 
+                m.Interestingness *= weightedChannelMultiplier;
         }
     }
     public float ContentWordCount(string aContent)
@@ -48,8 +51,10 @@ public class OnThisDay
         int lLinkCount = MediaLinkRegex.Matches(aContent ?? string.Empty).Count;
         return (aAttachmentCount + lLinkCount) * AttachmentMultiplier;
     }
-    public float MentionsUser(string aContent){
+    public float MentionsUser(string aContent)
+    {
         int lMentions = MentionsUserRegex.Matches(aContent ?? string.Empty).Count;
         return lMentions * MentionsUserMultiplier;
     }
+    public float ReactionCount(int aReactionCount) => aReactionCount * ReactionCountMultiplier;
 }

@@ -5,10 +5,10 @@ public class OnThisDayService
     /// </summary>
     /// <param name="aMessages">A list of messages from this day any year</param>
     /// <returns></returns>
-    public MessageRecord GetMotD(List<MessageRecord> aMessages)    {
+    public MessageRecord GetMotD(List<MessageRecord> aMessages, string aWeightedChannelID) { 
         
         var lMOTD = new OnThisDay(aMessages);
-        lMOTD.GenerateInterestingness();
+        lMOTD.GenerateInterestingness(aWeightedChannelID);
 
         var lBestMsg = aMessages
             .OrderByDescending(m => m.Interestingness)

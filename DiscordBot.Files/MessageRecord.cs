@@ -6,6 +6,7 @@ public class MessageRecord
     public string AuthorID { get; set; } = string.Empty;
     public string Content { get; set; } = string.Empty;
     public int AttachmentCount { get; set; }
+    public int ReactionCount { get; set; }
     public DateTime Timestamp { get; set; }
     public float Interestingness { get; set; }
 }

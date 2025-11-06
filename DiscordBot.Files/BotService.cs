@@ -22,7 +22,8 @@ public class BotService
     public void RegisterCommands()
     {
         var slash = _discord.UseSlashCommands();
-        slash.RegisterCommands<MyCommands>();
+        MyCommands lMyCommands = new MyCommands(_dbh);
+        // slash.RegisterCommands(lMyCommands); FIX DEPENDENCY INJECTION FOR MY COMMANDS
     }
     public void RegisterEventHandler()
     {
@@ -113,13 +114,15 @@ public class BotService
     {
         Console.WriteLine("Posting MOTD...");
         var MOTDService = new OnThisDayService();
+
         List<MessageRecord> lMessages = _dbh.GetTodaysMsgs(DateTime.UtcNow.Date);
-        var lBestMsg = MOTDService.GetMotD(lMessages);
+        DiscordChannel lChannel = await _discord.GetChannelAsync(BotTestChannelID);
+        var lGuildID = lChannel.Guild.Id.ToString();
+        
+        var lBestMsg = MOTDService.GetMotD(lMessages, _dbh.GetWeightedChannelID(lGuildID)!);
 
         if (lBestMsg != null)
         {
-            DiscordChannel lChannel = await _discord.GetChannelAsync(BotTestChannelID);
-
             if(lChannel is DiscordChannel)
             {
                 string lMessageURL = $"https://discord.com/channels/{lBestMsg.GuildID}/{lBestMsg.ChannelID}/{lBestMsg.MessageID}";
