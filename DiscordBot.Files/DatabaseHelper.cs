@@ -3,14 +3,16 @@ using Microsoft.Data.Sqlite;
 public class DatabaseHelper
 {
     private static readonly string _folderPath = Path.Combine(AppContext.BaseDirectory, "data");
-    private static readonly string _dbPath = Path.Combine(_folderPath, "Messages.db");
-    private readonly string _connectionString = $"Data Source={_dbPath}";
+    private static readonly string _messagesDBPath = Path.Combine(_folderPath, "Messages.db");
+    private static readonly string _channelInfoDBPath = Path.Combine(_folderPath, "ChannelInfo.db");
+    private readonly string _messagesConnectionString = $"Data Source={_messagesDBPath}";
+    private readonly string _channelInfoConnectionString = $"Data Source={_channelInfoDBPath}";
 
     public DatabaseHelper()
     {
         if (!Directory.Exists(_folderPath))
             Directory.CreateDirectory(_folderPath);
-        using var lConnection = new SqliteConnection(_connectionString);
+        using var lConnection = new SqliteConnection(_messagesConnectionString);
         lConnection.Open();
 
         string lTableCmd = @"CREATE TABLE IF NOT EXISTS Messages(
@@ -28,7 +30,7 @@ public class DatabaseHelper
     }
     public string? GetWeightedChannelID(string aGuildID)
     {
-        using var lConnection = new SqliteConnection(_connectionString);
+        using var lConnection = new SqliteConnection(_messagesConnectionString);
         lConnection.Open();
 
         string lSql = @"
@@ -42,7 +44,7 @@ public class DatabaseHelper
     }
     public void SaveMessage(DiscordMessage aMessage)
     {
-        using var lConnection = new SqliteConnection(_connectionString);
+        using var lConnection = new SqliteConnection(_messagesConnectionString);
         lConnection.Open();
 
         string lInsertCmd = @"INSERT OR REPLACE INTO Messages
@@ -67,7 +69,7 @@ public class DatabaseHelper
     /// <returns>List of MessageRecords</returns>
     public List<MessageRecord> GetTodaysMsgs(DateTime aDate)
     {
-        using var lConnection = new SqliteConnection(_connectionString);
+        using var lConnection = new SqliteConnection(_messagesConnectionString);
         lConnection.Open();
         List<MessageRecord> lMessages = new List<MessageRecord>();
 
@@ -104,5 +106,63 @@ public class DatabaseHelper
         }
 
         return lMessages;
+    }
+    /// <summary>
+    /// Sets MOTD channel for this guild. Saves it to database located in data folder ChannelInfo.db
+    /// </summary>
+    /// <param name="aGuildID">Discord guild ID</param>
+    /// <param name="aChannelID">MOTD channel ID</param>
+    public void SetMotDChannel(string aGuildID, string aChannelID)
+    {
+        using var lConnection = new SqliteConnection(_channelInfoConnectionString);
+        lConnection.Open();
+
+        CheckChannelTableExists(lConnection);
+
+        string lInsertCmd = @"
+            INSERT INTO ChannelInfo (GuildID, MoTDChannelID) 
+            VALUES ($GuildID, $MoTDChannelID) 
+            ON CONFLICT (GuildID) DO UPDATE SET MoTDChannelID = $MoTDChannelID";
+
+        using var lCmd = new SqliteCommand(lInsertCmd, lConnection);
+
+        lCmd.Parameters.AddWithValue("$GuildID", aGuildID);
+        lCmd.Parameters.AddWithValue("$MoTDChannelID", aChannelID);
+        lCmd.ExecuteNonQuery();
+    }
+    /// <summary>
+    /// Sets weighted channel to value messages at some X% more likely to be picked. Saves them to database located in data folder ChannelInfo.db
+    /// </summary>
+    /// <param name="aGuildID">Discord guild ID</param>
+    /// <param name="aChannelID">Weighted channel ID</param>
+    public void SetWeightedChannel(string aGuildID, string aChannelID)
+    {
+        using var lConnection = new SqliteConnection(_channelInfoConnectionString);
+        lConnection.Open();
+
+        CheckChannelTableExists(lConnection);
+
+        string lInsertCmd = @"
+            INSERT INTO ChannelInfo (GuildID, WeightedChannelID) 
+            VALUES ($GuildID, $WeightedChannelID) 
+            ON CONFLICT (GuildID) DO UPDATE SET WeightedChannelID = $WeightedChannelID";
+
+        using var lCmd = new SqliteCommand(lInsertCmd, lConnection);
+
+        lCmd.Parameters.AddWithValue("$GuildID", aGuildID);
+        lCmd.Parameters.AddWithValue("$WeightedChannelID", aChannelID);
+        lCmd.ExecuteNonQuery();
+    }
+    
+    private void CheckChannelTableExists(SqliteConnection aConnection)
+    {
+      string lTableCmd = @"
+            CREATE TABLE IF NOT EXISTS ChannelInfo (
+                GuildID TEXT PRIMARY KEY,
+                WeightedChannelID TEXT,
+                MoTDChannelID TEXT
+            )";
+        using var createCmd = new SqliteCommand(lTableCmd, aConnection);
+        createCmd.ExecuteNonQuery();
     }
 }

@@ -1,6 +1,7 @@
 using DSharpPlus;
 using DSharpPlus.Entities;
 using DSharpPlus.SlashCommands;
+using Microsoft.Extensions.DependencyInjection;
 
 public class BotService
 {
@@ -21,9 +22,15 @@ public class BotService
     }
     public void RegisterCommands()
     {
-        var slash = _discord.UseSlashCommands();
-        MyCommands lMyCommands = new MyCommands(_dbh);
-        // slash.RegisterCommands(lMyCommands); FIX DEPENDENCY INJECTION FOR MY COMMANDS
+        var lServices = new ServiceCollection()
+            .AddSingleton<DatabaseHelper>(_dbh)
+            .BuildServiceProvider();
+
+        var slash = _discord.UseSlashCommands(new SlashCommandsConfiguration
+        {
+            Services = lServices
+        });
+        slash.RegisterCommands<MyCommands>();
     }
     public void RegisterEventHandler()
     {
