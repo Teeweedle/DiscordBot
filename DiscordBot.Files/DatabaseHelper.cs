@@ -6,41 +6,32 @@ public class DatabaseHelper
     private static readonly string _messagesDBPath = Path.Combine(_folderPath, "Messages.db");
     private static readonly string _channelInfoDBPath = Path.Combine(_folderPath, "ChannelInfo.db");
     private readonly string _messagesConnectionString = $"Data Source={_messagesDBPath}";
-    private readonly string _channelInfoConnectionString = $"Data Source={_channelInfoDBPath}";
+    private string _channelInfoConnectionString = $"Data Source={_channelInfoDBPath}";
 
-    public DatabaseHelper()
+    public DatabaseHelper(string? aConnectionString = null)
     {
-        if (!Directory.Exists(_folderPath))
-            Directory.CreateDirectory(_folderPath);
-        using var lConnection = new SqliteConnection(_messagesConnectionString);
-        lConnection.Open();
+        _channelInfoConnectionString = aConnectionString ?? _channelInfoConnectionString;
 
-        string lTableCmd = @"CREATE TABLE IF NOT EXISTS Messages(
-            MessageID TEXT PRIMARY KEY,
-            GuildID TEXT,
-            ChannelID TEXT,
-            AuthorID TEXT,
-            Content TEXT,
-            AttachmentCount INTEGER,
-            ReactionCount INTEGER,
-            Timestamp TEXT
-        )";
-        using var createCmd = new SqliteCommand(lTableCmd, lConnection);
-        createCmd.ExecuteNonQuery();
-    }
-    public string? GetWeightedChannelID(string aGuildID)
-    {
-        using var lConnection = new SqliteConnection(_messagesConnectionString);
-        lConnection.Open();
-
-        string lSql = @"
-            SELECT WeightedChannelID FROM WeightedChannels WHERE GuildID = $GuildID LIMIT 1";
-            
-        using var lCmd = new SqliteCommand(lSql, lConnection);
-        lCmd.Parameters.AddWithValue("$GuildID", aGuildID);
-        
-        var result = lCmd.ExecuteScalar();
-        return result?.ToString();          
+        if (aConnectionString == null)
+        {
+            if (!Directory.Exists(_folderPath))
+                Directory.CreateDirectory(_folderPath);
+            using var lConnection = new SqliteConnection(_messagesConnectionString);
+            lConnection.Open();
+    
+            string lTableCmd = @"CREATE TABLE IF NOT EXISTS Messages(
+                MessageID TEXT PRIMARY KEY,
+                GuildID TEXT,
+                ChannelID TEXT,
+                AuthorID TEXT,
+                Content TEXT,
+                AttachmentCount INTEGER,
+                ReactionCount INTEGER,
+                Timestamp TEXT
+            )";
+            using var createCmd = new SqliteCommand(lTableCmd, lConnection);
+            createCmd.ExecuteNonQuery();
+        }
     }
     public void SaveMessage(DiscordMessage aMessage)
     {
@@ -153,7 +144,40 @@ public class DatabaseHelper
         lCmd.Parameters.AddWithValue("$WeightedChannelID", aChannelID);
         lCmd.ExecuteNonQuery();
     }
-    
+    public string? GetWeightedChannelID(string aGuildID)
+    {
+        using var lConnection = new SqliteConnection(_channelInfoConnectionString);
+        lConnection.Open();
+
+        string lSql = @"
+            SELECT WeightedChannelID 
+            FROM ChannelInfo 
+            WHERE GuildID = $GuildID 
+            LIMIT 1";
+            
+        using var lCmd = new SqliteCommand(lSql, lConnection);
+        lCmd.Parameters.AddWithValue("$GuildID", aGuildID);
+        
+        var result = lCmd.ExecuteScalar();
+        return result?.ToString();          
+    }
+    public string? GetMoTDChannelID(string aGuildID)
+    {
+        using var lConnection = new SqliteConnection(_channelInfoConnectionString);
+        lConnection.Open();
+
+        string lSql = @"
+            SELECT MoTDChannelID 
+            FROM ChannelInfo 
+            WHERE GuildID = $GuildID 
+            LIMIT 1";
+            
+        using var lCmd = new SqliteCommand(lSql, lConnection);
+        lCmd.Parameters.AddWithValue("$GuildID", aGuildID);
+        
+        var result = lCmd.ExecuteScalar();
+        return result?.ToString();
+    }
     private void CheckChannelTableExists(SqliteConnection aConnection)
     {
       string lTableCmd = @"
