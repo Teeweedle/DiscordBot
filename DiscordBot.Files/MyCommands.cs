@@ -61,7 +61,7 @@ public class MyCommands : ApplicationCommandModule
             await ctx.CreateResponseAsync("You must be in a guild to use this command.");
             return;
         } 
-        string? lChannelID = ldb.GetWeightedChannelID(ctx.Guild.Id.ToString());
+        string? lChannelID = ldb.GetWeightedChannelID();
         if(string.IsNullOrEmpty(lChannelID))
         {
             await ctx.CreateResponseAsync("No weighted channel set.");
@@ -75,6 +75,7 @@ public class MyCommands : ApplicationCommandModule
     public async Task OTDCommand(InteractionContext ctx)
     {
         //TODO: Get a rng message for this day some time ago...
+        //Send ctx to PostMotD so it knows what channel if no channel is set
 
     }   
 }

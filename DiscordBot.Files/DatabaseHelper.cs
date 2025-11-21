@@ -144,7 +144,7 @@ public class DatabaseHelper
         lCmd.Parameters.AddWithValue("$WeightedChannelID", aChannelID);
         lCmd.ExecuteNonQuery();
     }
-    public string? GetWeightedChannelID(string aGuildID)
+    public string? GetWeightedChannelID()
     {
         using var lConnection = new SqliteConnection(_channelInfoConnectionString);
         lConnection.Open();
@@ -152,28 +152,24 @@ public class DatabaseHelper
         string lSql = @"
             SELECT WeightedChannelID 
             FROM ChannelInfo 
-            WHERE GuildID = $GuildID 
             LIMIT 1";
             
         using var lCmd = new SqliteCommand(lSql, lConnection);
-        lCmd.Parameters.AddWithValue("$GuildID", aGuildID);
         
         var result = lCmd.ExecuteScalar();
         return result?.ToString();          
     }
-    public string? GetMoTDChannelID(string aGuildID)
+    public string? GetMoTDChannelID()
     {
         using var lConnection = new SqliteConnection(_channelInfoConnectionString);
         lConnection.Open();
 
         string lSql = @"
             SELECT MoTDChannelID 
-            FROM ChannelInfo 
-            WHERE GuildID = $GuildID 
+            FROM ChannelInfo
             LIMIT 1";
             
         using var lCmd = new SqliteCommand(lSql, lConnection);
-        lCmd.Parameters.AddWithValue("$GuildID", aGuildID);
         
         var result = lCmd.ExecuteScalar();
         return result?.ToString();

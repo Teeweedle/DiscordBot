@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using DSharpPlus;
 using DSharpPlus.Entities;
 using DSharpPlus.SlashCommands;
@@ -9,6 +10,10 @@ public class BotService
     private readonly DiscordClient _discord;
     private readonly DatabaseHelper _dbh = new();
     private readonly ulong BotTestChannelID = 1428046909737533480;
+    private static readonly Regex MediaLinkRegex = new Regex(
+        @"https?:\/\/(?:[^\s]+?\.(?:gif|mp3|mp4|png|jpg|jpeg|webm)|(?:www\.)?(?:reddit\.com|v\.redd\.it|imgur\.com|gfycat\.com|tenor\.com|youtube\.com|youtu\.be)[^\s]*)",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled
+    );
 
     public BotService(string aToken)
     {
@@ -123,24 +128,42 @@ public class BotService
         var MOTDService = new OnThisDayService();
 
         List<MessageRecord> lMessages = _dbh.GetTodaysMsgs(DateTime.UtcNow.Date);
-        DiscordChannel lChannel = await _discord.GetChannelAsync(BotTestChannelID);
-        var lGuildID = lChannel.Guild.Id.ToString();
+        var lMotdID = _dbh.GetMoTDChannelID();
+        if(lMotdID == null) //LEFT OFF HERE, handle if no channel
+        {
+            var lmsgBuilder = new DiscordMessageBuilder().
+                WithContent("No MoTD channel set.");
+            await _discord.GetChannelAsync(BotTestChannelID).Result.SendMessageAsync(lmsgBuilder);
+            return;
+        }
+        DiscordChannel lChannel = await _discord.GetChannelAsync(ulong.Parse(lMotdID));
         
-        var lBestMsg = MOTDService.GetMotD(lMessages, _dbh.GetWeightedChannelID(lGuildID)!);
+        var lBestMsg = MOTDService.GetMotD(lMessages, _dbh.GetWeightedChannelID()!);
 
         if (lBestMsg != null)
         {
             if(lChannel is DiscordChannel)
-            {
-                string lMessageURL = $"https://discord.com/channels/{lBestMsg.GuildID}/{lBestMsg.ChannelID}/{lBestMsg.MessageID}";
-                var lmsgBuilder = new DiscordMessageBuilder().
-                    WithContent($"**On this day in {lBestMsg.Timestamp.Year} -- <@{lBestMsg.AuthorID}> said: **\n\n" +
-                        $"{lBestMsg.Content}\n\n" +
-                        $"[view orignal message]({lMessageURL})")
-                        .WithAllowedMentions(Mentions.None);               
-
-                await lChannel.SendMessageAsync(lmsgBuilder);    
+            {                
+                await lChannel.SendMessageAsync(FormatMessage(lBestMsg));    
             }            
         }
+    }
+    private DiscordEmbed FormatMessage(MessageRecord aMessage)
+    {
+        string lMessageURL = $"https://discord.com/channels/{aMessage.GuildID}/{aMessage.ChannelID}/{aMessage.MessageID}";
+        var lMediaLink = MediaLinkRegex.Match(aMessage.Content).ToString();
+        var lRemoveLinkMsg = aMessage.Content.Replace(lMediaLink, "");
+
+        var embed = new DiscordEmbedBuilder()
+            .WithTitle($"On this day in {aMessage.Timestamp.Year}")
+            .WithDescription($"<@{aMessage.AuthorID}> said: {lRemoveLinkMsg}")            
+            .WithColor(DiscordColor.Red);
+        //TODO: Add media link for link embeding
+        if (lMediaLink != null)
+            embed.WithUrl(lMediaLink);                    
+            // embed.WithImageUrl(lMediaLink);
+        
+        embed.AddField("\u200B", $"[view orignal message]({lMessageURL})", inline:true);
+        return embed.Build();
     }
 }

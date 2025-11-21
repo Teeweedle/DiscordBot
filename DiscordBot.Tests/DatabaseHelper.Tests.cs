@@ -24,38 +24,38 @@ public class DatabaseHelperTests
     public void SetWeightedChannel_StoreValues()
     {
         _testDB.SetWeightedChannel("123", "234");
-        Assert.That(_testDB.GetWeightedChannelID("123"), Is.EqualTo("234"));
+        Assert.That(_testDB.GetWeightedChannelID(), Is.EqualTo("234"));
     }
     [Test]
     public void SetWeightedChannel_UpdateValues()
     {
         _testDB.SetWeightedChannel("123", "234");
         _testDB.SetWeightedChannel("123", "345");
-        Assert.That(_testDB.GetWeightedChannelID("123"), Is.EqualTo("345"));
+        Assert.That(_testDB.GetWeightedChannelID(), Is.EqualTo("345"));
     }
     [Test]
     public void GetWeightedChannel_NullWhenNotSet()
     {
-        var result = _testDB.GetWeightedChannelID("123");
+        var result = _testDB.GetWeightedChannelID();
         Assert.That(result, Is.Null);
     }
     [Test]
     public void SetMotDChannel_StoreValues()
     {
         _testDB.SetMotDChannel("123", "234");
-        Assert.That(_testDB.GetMoTDChannelID("123"), Is.EqualTo("234"));
+        Assert.That(_testDB.GetMoTDChannelID(), Is.EqualTo("234"));
     }
     [Test]
     public void SetMotDChannel_UpdateValues()
     {
         _testDB.SetMotDChannel("123", "234");
         _testDB.SetMotDChannel("123", "345");
-        Assert.That(_testDB.GetMoTDChannelID("123"), Is.EqualTo("345"));
+        Assert.That(_testDB.GetMoTDChannelID(), Is.EqualTo("345"));
     }
     [Test]
     public void GetMotDChannel_NullWhenNotSet()
     {
-        var result = _testDB.GetMoTDChannelID("123");
+        var result = _testDB.GetMoTDChannelID();
         Assert.That(result, Is.Null);
     }
 }

@@ -64,7 +64,7 @@ public class OnThisDayServiceTests
     public void PostMotD_ReturnsMessageWithHighestInterestingness()  
     {
         var lService = new OnThisDayService();
-        var lWeightedChannelID = _dbh.GetWeightedChannelID(GuildID) ?? "";//Hardcoded guildID from my server
+        var lWeightedChannelID = _dbh.GetWeightedChannelID() ?? "";//Hardcoded guildID from my server
         var lMessage = lService.GetMotD(_messages!, lWeightedChannelID);
         TestContext.WriteLine($"Best Interestingness message - {lMessage!.Interestingness} \n" +
                             $"The message is - {lMessage.Content}\n" +
