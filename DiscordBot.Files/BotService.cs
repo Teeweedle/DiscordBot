@@ -43,7 +43,34 @@ public class BotService
                SaveMessage(e.Message);
        };
     }
+    public async Task<DiscordWebhook> EnsureAvailableWebhookAsync(ulong aChannelID)
+    {
+        DiscordChannel lChannel = await _discord.GetChannelAsync(aChannelID);
 
+        string? lWebHookID = _dbh.GetWebHookID(lChannel.GuildId!.Value.ToString(), aChannelID.ToString());
+        string? lWebHookToken = _dbh.GetWebHookToken(lChannel.GuildId!.Value.ToString(), aChannelID.ToString());
+
+        if (lWebHookID != null && lWebHookToken != null)
+        {
+            return await _discord.GetWebhookWithTokenAsync(ulong.Parse(lWebHookID!), lWebHookToken!);
+        }
+
+        var lExistingWebhooks = await lChannel.GetWebhooksAsync();
+        var lWebHook = lExistingWebhooks.FirstOrDefault(x => x.Name == "OnThisDayWebhook");
+        
+        if (lWebHook == null)
+        {
+            lWebHook = await lChannel.CreateWebhookAsync("OnThisDayWebhook");
+
+            if (lWebHook == null)
+            {
+                throw new Exception("Failed to create webhook., bot does not have permissions.");
+            }
+        }
+        
+        _dbh.SaveWebHook(lChannel.GuildId!.Value.ToString(), aChannelID.ToString(), lWebHook.Id.ToString(), lWebHook.Token!);
+        return await _discord.GetWebhookWithTokenAsync(lWebHook.Id, lWebHook.Token!);
+    }
     public async Task RunAsync()
     {
         RegisterCommands();
@@ -129,13 +156,15 @@ public class BotService
         var lMotdID = _dbh.GetMoTDChannelID();
         if(lMotdID == null) //LEFT OFF HERE, handle if no channel
         {
-            var lmsgBuilder = new DiscordMessageBuilder().
-                WithContent("No MoTD channel set.");
+            var lmsgBuilder = new DiscordMessageBuilder()
+                .WithContent("No MoTD channel set.");
             await _discord.GetChannelAsync(BotTestChannelID).Result.SendMessageAsync(lmsgBuilder);
             return;
         }
         DiscordChannel lChannel = await _discord.GetChannelAsync(ulong.Parse(lMotdID));
         
+    
+
         var lBestMsg = MOTDService.GetMotD(lMessages, _dbh.GetWeightedChannelID()!);
         var lSourceChannel = await _discord.GetChannelAsync(ulong.Parse(lBestMsg.ChannelID));
         var lOriginalMsg = await lSourceChannel.GetMessageAsync(ulong.Parse(lBestMsg.MessageID));
@@ -155,7 +184,7 @@ public class BotService
     /// <returns></returns>
     private async Task SendMessage(DiscordMessage aMessage)
     {
-        var lWebHook = await _discord.GetWebhookWithTokenAsync(WebHookID, WebHookToken);        
+        var lWebHook = await EnsureAvailableWebhookAsync(aMessage.ChannelId);        
 
         var lWebHookBuilder = new DiscordWebhookBuilder()
             .WithUsername($"On this day in {aMessage.CreationTimestamp.Year}")

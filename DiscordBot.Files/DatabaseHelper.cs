@@ -5,8 +5,10 @@ public class DatabaseHelper
     private static readonly string _folderPath = Path.Combine(AppContext.BaseDirectory, "data");
     private static readonly string _messagesDBPath = Path.Combine(_folderPath, "Messages.db");
     private static readonly string _channelInfoDBPath = Path.Combine(_folderPath, "ChannelInfo.db");
+    private static readonly string _webhookInfoDBPath = Path.Combine(_folderPath, "WebhookInfo.db");
     private readonly string _messagesConnectionString = $"Data Source={_messagesDBPath}";
     private string _channelInfoConnectionString = $"Data Source={_channelInfoDBPath}";
+    private string _webhookInfoConnectionString = $"Data Source={_webhookInfoDBPath}";
 
     public DatabaseHelper(string? aConnectionString = null)
     {
@@ -187,5 +189,73 @@ public class DatabaseHelper
             )";
         using var createCmd = new SqliteCommand(lTableCmd, aConnection);
         createCmd.ExecuteNonQuery();
+    }
+    private void CheckWebHookTableExists(SqliteConnection aConnection)
+    {
+      string lTableCmd = @"
+            CREATE TABLE IF NOT EXISTS WebhookInfo (
+                GuildID TEXT,
+                ChannelID TEXT,
+                WebhookID TEXT,
+                WebhookToken TEXT,
+                PRIMARY KEY (GuildID, ChannelID)
+            )";
+        using var createCmd = new SqliteCommand(lTableCmd, aConnection);
+        createCmd.ExecuteNonQuery();
+    }
+    public void SaveWebHook(string aGuildID, string aChannelID, string aWebhookID, string aWebhookToken)
+    {
+        using var lConnection = new SqliteConnection(_webhookInfoConnectionString);
+        lConnection.Open();
+
+        CheckWebHookTableExists(lConnection);
+
+        string lInsertCmd = @"
+            INSERT INTO WebhookInfo (GuildID, ChannelID, WebhookID, WebhookToken) 
+            VALUES ($GuildID, $ChannelID, $WebhookID, $WebhookToken) 
+            ON CONFLICT (GuildID, ChannelID) 
+            DO UPDATE SET WebhookID = $WebhookID, WebhookToken = $WebhookToken";
+
+        using var lCmd = new SqliteCommand(lInsertCmd, lConnection);
+
+        lCmd.Parameters.AddWithValue("$GuildID", aGuildID);
+        lCmd.Parameters.AddWithValue("$ChannelID", aChannelID);
+        lCmd.Parameters.AddWithValue("$WebhookID", aWebhookID);
+        lCmd.Parameters.AddWithValue("$WebhookToken", aWebhookToken);
+        lCmd.ExecuteNonQuery();
+    }
+    public string? GetWebHookID(string aGuildID, string aChannelID)
+    {
+        using var lConnection = new SqliteConnection(_webhookInfoConnectionString);
+        lConnection.Open();
+
+        string lSql = @"
+            SELECT WebhookID 
+            FROM WebhookInfo
+            WHERE GuildID = $GuildID AND ChannelID = $ChannelID";
+            
+        using var lCmd = new SqliteCommand(lSql, lConnection);
+        lCmd.Parameters.AddWithValue("$GuildID", aGuildID);
+        lCmd.Parameters.AddWithValue("$ChannelID", aChannelID);
+        
+        var result = lCmd.ExecuteScalar();
+        return result?.ToString();
+    }
+    public string? GetWebHookToken(string aGuildID, string aChannelID)
+    {
+        using var lConnection = new SqliteConnection(_webhookInfoConnectionString);
+        lConnection.Open();
+
+        string lSql = @"
+            SELECT WebhookToken 
+            FROM WebhookInfo
+            WHERE GuildID = $GuildID AND ChannelID = $ChannelID";
+            
+        using var lCmd = new SqliteCommand(lSql, lConnection);
+        lCmd.Parameters.AddWithValue("$GuildID", aGuildID);
+        lCmd.Parameters.AddWithValue("$ChannelID", aChannelID);
+        
+        var result = lCmd.ExecuteScalar();
+        return result?.ToString();
     }
 }
