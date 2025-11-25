@@ -49,6 +49,8 @@ public class DatabaseHelper
         lCmd.Parameters.AddWithValue("$AuthorID", aMessage.Author.Id.ToString());
         lCmd.Parameters.AddWithValue("$Content", aMessage.Content);
         lCmd.Parameters.AddWithValue("$AttachmentCount", aMessage.Attachments.Count);
+
+        
         lCmd.Parameters.AddWithValue("$ReactionCount", aMessage.Reactions.Count);
         lCmd.Parameters.AddWithValue("$Timestamp", aMessage.CreationTimestamp.ToString("o"));
 
@@ -82,6 +84,7 @@ public class DatabaseHelper
         using var lReader = lcmd.ExecuteReader();
         while (lReader.Read())
         {
+                     
             lMessages.Add(new MessageRecord
             {
                 MessageID = lReader.GetString(lReader.GetOrdinal("MessageID")),

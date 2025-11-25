@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using DSharpPlus;
 using DSharpPlus.Entities;
 using DSharpPlus.SlashCommands;
@@ -10,10 +9,9 @@ public class BotService
     private readonly DiscordClient _discord;
     private readonly DatabaseHelper _dbh = new();
     private readonly ulong BotTestChannelID = 1428046909737533480;
-    private static readonly Regex MediaLinkRegex = new Regex(
-        @"https?:\/\/(?:[^\s]+?\.(?:gif|mp3|mp4|png|jpg|jpeg|webm)|(?:www\.)?(?:reddit\.com|v\.redd\.it|imgur\.com|gfycat\.com|tenor\.com|youtube\.com|youtu\.be)[^\s]*)",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled
-    );
+    private static readonly HttpClient _httpClient = new HttpClient();
+    private readonly ulong WebHookID = 1442589833691140259;
+    private readonly string WebHookToken = "LJY1lnvosKdt_pQw2cAC9KzbpYjezg17jdvEQYduEt7lwGf-TpwJdUWhjOtmtx2ygfFg";
 
     public BotService(string aToken)
     {
@@ -139,31 +137,41 @@ public class BotService
         DiscordChannel lChannel = await _discord.GetChannelAsync(ulong.Parse(lMotdID));
         
         var lBestMsg = MOTDService.GetMotD(lMessages, _dbh.GetWeightedChannelID()!);
+        var lSourceChannel = await _discord.GetChannelAsync(ulong.Parse(lBestMsg.ChannelID));
+        var lOriginalMsg = await lSourceChannel.GetMessageAsync(ulong.Parse(lBestMsg.MessageID));
 
         if (lBestMsg != null)
         {
             if(lChannel is DiscordChannel)
             {                
-                await lChannel.SendMessageAsync(FormatMessage(lBestMsg));    
+                await SendMessage(lOriginalMsg);    
             }            
         }
     }
-    private DiscordEmbed FormatMessage(MessageRecord aMessage)
+    /// <summary>
+    /// Formats and sends a message using a webhook
+    /// </summary>
+    /// <param name="aMessage">The message to send</param>
+    /// <returns></returns>
+    private async Task SendMessage(DiscordMessage aMessage)
     {
-        string lMessageURL = $"https://discord.com/channels/{aMessage.GuildID}/{aMessage.ChannelID}/{aMessage.MessageID}";
-        var lMediaLink = MediaLinkRegex.Match(aMessage.Content).ToString();
-        var lRemoveLinkMsg = aMessage.Content.Replace(lMediaLink, "");
+        var lWebHook = await _discord.GetWebhookWithTokenAsync(WebHookID, WebHookToken);        
 
-        var embed = new DiscordEmbedBuilder()
-            .WithTitle($"On this day in {aMessage.Timestamp.Year}")
-            .WithDescription($"<@{aMessage.AuthorID}> said: {lRemoveLinkMsg}")            
-            .WithColor(DiscordColor.Red);
-        //TODO: Add media link for link embeding
-        if (lMediaLink != null)
-            embed.WithUrl(lMediaLink);                    
-            // embed.WithImageUrl(lMediaLink);
-        
-        embed.AddField("\u200B", $"[view orignal message]({lMessageURL})", inline:true);
-        return embed.Build();
+        var lWebHookBuilder = new DiscordWebhookBuilder()
+            .WithUsername($"On this day in {aMessage.CreationTimestamp.Year}")
+            .WithContent($"<@{aMessage.Author.Id}> said: \n\n"+
+                $"{aMessage.Content} \n\n");
+            
+        foreach (var attachment in aMessage.Attachments)
+        {
+            var lStream = await _httpClient.GetStreamAsync(attachment.Url);
+            lWebHookBuilder.AddFile(attachment.FileName, lStream);
+        }
+        await lWebHook.ExecuteAsync(lWebHookBuilder);
+
+        var lFooter = new DiscordWebhookBuilder()
+            .WithUsername($"On this day in {aMessage.CreationTimestamp.Year}")
+            .WithContent($"[view orignal message]({aMessage.JumpLink})");
+        await lWebHook.ExecuteAsync(lFooter);
     }
 }
