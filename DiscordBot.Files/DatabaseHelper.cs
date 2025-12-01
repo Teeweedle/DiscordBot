@@ -1,5 +1,6 @@
 using DSharpPlus.Entities;
 using Microsoft.Data.Sqlite;
+using NUnit.Framework.Constraints;
 public class DatabaseHelper
 {
     private static readonly string _folderPath = Path.Combine(AppContext.BaseDirectory, "data");
@@ -64,29 +65,36 @@ public class DatabaseHelper
     /// <returns>List of MessageRecords</returns>
     public List<MessageRecord> GetTodaysMsgs(DateTime aDate)
     {
+        var lStartUTC = new DateTime(aDate.Year, aDate.Month, aDate.Day, 0, 0, 0, DateTimeKind.Utc);
+        var lEndUTC = lStartUTC.AddDays(1);
+
         using var lConnection = new SqliteConnection(_messagesConnectionString);
         lConnection.Open();
-        List<MessageRecord> lMessages = new List<MessageRecord>();
 
-        //select all messages from today (m/d) and any year but this year
-        string lSql = @"SELECT * FROM Messages
-                            WHERE strftime('%m-%d', Timestamp) = strftime('%m-%d', $date)
-                            AND strftime('%Y', Timestamp) = (
-                                    SELECT strftime('%Y', Timestamp)
-                                    FROM Messages
-                                    WHERE strftime('%m-%d', Timestamp) = strftime('%m-%d', $date)
-                                    AND strftime('%Y', Timestamp) != strftime('%Y', 'now')
-                                    ORDER BY RANDOM()
-                                    LIMIT 1
-                                )
-                            AND LENGTH(Content) > 3";
-        using var lcmd = new SqliteCommand(lSql, lConnection);
-        lcmd.Parameters.AddWithValue("$date", aDate.ToString("yyyy-MM-dd"));
+        var lYearsWithMessages = GetYearsWithMessages(lConnection, lStartUTC, lEndUTC);
+        
+        var lMessages = new List<MessageRecord>();
+        if (lYearsWithMessages.Count == 0)//If there are no years with messages
+            return new List<MessageRecord>();
+            
+        var lRNG = new Random();
+        var lYear = lYearsWithMessages[lRNG.Next(lYearsWithMessages.Count)];
 
-        using var lReader = lcmd.ExecuteReader();
+        using var lCmd = lConnection.CreateCommand();
+        lCmd.CommandText = @"
+                            SELECT *
+                            FROM Messages
+                            WHERE strftime('%m', Timestamp, 'utc') = $Month
+                                AND strftime('%d', Timestamp, 'utc') = $Day
+                                AND strftime('%Y', Timestamp, 'utc') = $Year
+                                AND (LENGTH(Content) > 3 OR AttachmentCount > 0)";
+        lCmd.Parameters.AddWithValue("$Month", aDate.Month.ToString("D2")); 
+        lCmd.Parameters.AddWithValue("$Day", aDate.Day.ToString("D2"));
+        lCmd.Parameters.AddWithValue("$Year", lYear);
+        
+        using var lReader = lCmd.ExecuteReader();
         while (lReader.Read())
         {
-                     
             lMessages.Add(new MessageRecord
             {
                 MessageID = lReader.GetString(lReader.GetOrdinal("MessageID")),
@@ -96,12 +104,35 @@ public class DatabaseHelper
                 Content = lReader.GetString(lReader.GetOrdinal("Content")),
                 AttachmentCount = lReader.GetInt32(lReader.GetOrdinal("AttachmentCount")),
                 ReactionCount = lReader.GetInt32(lReader.GetOrdinal("ReactionCount")),
-                Timestamp = DateTime.Parse(lReader.GetString(lReader.GetOrdinal("Timestamp"))),
-                Interestingness = 0
+                Timestamp = DateTime.Parse(lReader.GetString(lReader.GetOrdinal("Timestamp")), 
+                                                null, System.Globalization.DateTimeStyles.AdjustToUniversal)
             });
-        }
+        }      
 
         return lMessages;
+    }
+    private List<int> GetYearsWithMessages(SqliteConnection aConnection, DateTime aStartUTC, DateTime aEndUTC)
+    {
+        
+        var lYearsWithMessages = new List<int>();
+
+        using(var lCmd = aConnection.CreateCommand())
+        {
+            lCmd.CommandText = @"
+                                SELECT DISTINCT strftime('%Y', Timestamp) as Year
+                                FROM Messages
+                                WHERE Timestamp BETWEEN $start AND $end
+                                ORDER BY Random()";
+            lCmd.Parameters.AddWithValue("$start", aStartUTC.ToString("yyyy-MM-ddTHH:mm:ss"));
+            lCmd.Parameters.AddWithValue("$end", aEndUTC.ToString("yyyy-MM-ddTHH:mm:ss"));
+
+            using var lYearReader = lCmd.ExecuteReader();
+            while (lYearReader.Read())
+            {
+                lYearsWithMessages.Add(int.Parse(lYearReader.GetString(0)));
+            }
+        }
+        return lYearsWithMessages;
     }
     /// <summary>
     /// Sets MOTD channel for this guild. Saves it to database located in data folder ChannelInfo.db
