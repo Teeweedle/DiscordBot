@@ -9,7 +9,8 @@ public class BotService
     private readonly string _token;
     private readonly DiscordClient _discord;
     private readonly DatabaseHelper _dbh = new();
-    private readonly ulong BotTestChannelID = 1428046909737533480;
+    private readonly ulong BotTestChannelID = 1445164447093227633;
+    private readonly ulong BotID = 1428047784245854310;
     private static readonly HttpClient _httpClient = new HttpClient();
 
     public BotService(string aToken)
@@ -49,7 +50,7 @@ public class BotService
         string? lWebHookID = _dbh.GetWebHookID(lChannel.GuildId!.Value.ToString(), aChannelID.ToString());
         string? lWebHookToken = _dbh.GetWebHookToken(lChannel.GuildId!.Value.ToString(), aChannelID.ToString());
 
-        if (lWebHookID != null && lWebHookToken != null)
+        if (!string.IsNullOrEmpty(lWebHookID) && !string.IsNullOrEmpty(lWebHookToken))
         {
             return await _discord.GetWebhookWithTokenAsync(ulong.Parse(lWebHookID!), lWebHookToken!);
         }
@@ -67,7 +68,11 @@ public class BotService
             }
         }
         
-        _dbh.SaveWebHook(lChannel.GuildId!.Value.ToString(), aChannelID.ToString(), lWebHook.Id.ToString(), lWebHook.Token!);
+        _dbh.SaveWebHook(
+            lChannel.GuildId!.Value.ToString(), 
+            aChannelID.ToString(), 
+            lWebHook.Id.ToString(), 
+            lWebHook.Token!);
         return await _discord.GetWebhookWithTokenAsync(lWebHook.Id, lWebHook.Token!);
     }
     public async Task RunAsync()
@@ -149,28 +154,36 @@ public class BotService
             }
         }
     }
-    public async Task PostMotDAsync()
+    public async Task PostMotDAsync(bool testMode = false)
     {
         Console.WriteLine("Posting MOTD...");
         var MOTDService = new OnThisDayService();
+        ulong lChannelID;
 
         List<MessageRecord> lMessages = _dbh.GetTodaysMsgs(DateTime.UtcNow.Date);
 
+        if (testMode)
+        {
+            lChannelID = BotTestChannelID;
+        }
+        else
+        {
+            string? lmotdID = _dbh.GetMoTDChannelID()!;
+            if(string.IsNullOrEmpty(lmotdID)) //LEFT OFF HERE, handle if no channel
+            {            
+                await SendMessage("No MoTD channel set.", BotTestChannelID);
+                return;
+            }
+            lChannelID = ulong.Parse(lmotdID);   
+        }
+        
         if (lMessages.Count == 0)
         {
-            await SendMessage("Today is a slow day in history. no messages were found for today.");
+            await SendMessage("Today is a slow day in history. No messages were found for today.", lChannelID);
             return;
         }
-        var lMotdID = _dbh.GetMoTDChannelID();
-        if(lMotdID == null) //LEFT OFF HERE, handle if no channel
-        {            
-            await SendMessage("No MoTD channel set.");
-            return;
-        }
-        DiscordChannel lChannel = await _discord.GetChannelAsync(ulong.Parse(lMotdID));
-        
+        DiscordChannel lChannel = await _discord.GetChannelAsync(lChannelID);   
     
-
         var lBestMsg = MOTDService.GetMotD(lMessages, _dbh.GetWeightedChannelID()!);
         var lSourceChannel = await _discord.GetChannelAsync(ulong.Parse(lBestMsg.ChannelID));
         var lOriginalMsg = await lSourceChannel.GetMessageAsync(ulong.Parse(lBestMsg.MessageID));
@@ -179,23 +192,26 @@ public class BotService
         {
             if(lChannel is DiscordChannel)
             {                
-                await SendMessage(lOriginalMsg);    
+                await SendMessage(lOriginalMsg, lChannelID);    
             }            
         }
     }
     /// <summary>
     /// Formats and sends a message using a webhook
     /// </summary>
-    /// <param name="aMessage">The message to send</param>
+    /// <param name="aMessage"></param>
+    /// <param name="aChannelID">Channel to send to</param>
     /// <returns></returns>
-    private async Task SendMessage(DiscordMessage aMessage)
+    private async Task SendMessage(DiscordMessage aMessage, ulong aChannelID)
     {
-        var lWebHook = await EnsureAvailableWebhookAsync(aMessage.ChannelId);        
-
+        var lWebHook = await EnsureAvailableWebhookAsync(aChannelID);  
+        var lBot = await _discord.GetUserAsync(BotID);  
+        
         var lWebHookBuilder = new DiscordWebhookBuilder()
-            .WithUsername($"On this day in {aMessage.CreationTimestamp.Year}")
-            .WithContent($"<@{aMessage.Author.Id}> said: \n\n"+
-                $"{aMessage.Content} \n\n");
+            .WithUsername($"\nOn this day in {aMessage.CreationTimestamp.Year}")
+            .WithContent($"<@{aMessage.Author.Id}> said: \n"+
+                $"{aMessage.Content} \n\n")
+            .WithAvatarUrl(lBot.AvatarUrl);
             
         foreach (var attachment in aMessage.Attachments)
         {
@@ -206,13 +222,20 @@ public class BotService
 
         var lFooter = new DiscordWebhookBuilder()
             .WithUsername($"On this day in {aMessage.CreationTimestamp.Year}")
-            .WithContent($"[view orignal message]({aMessage.JumpLink})");
+            .WithContent($"[view orignal message]({aMessage.JumpLink})")
+            .WithAvatarUrl(lBot.AvatarUrl);
         await lWebHook.ExecuteAsync(lFooter);
     }
-    private async Task SendMessage(string aMessage)
+    /// <summary>
+    /// Formats and sends a message using DiscordMessageBuilder
+    /// </summary>
+    /// <param name="aMessage"></param>
+    /// <param name="aChannelID">Channel to send to</param>
+    /// <returns></returns>
+    private async Task SendMessage(string aMessage, ulong aChannelID)
     {
         var lmsgBuilder = new DiscordMessageBuilder();
         lmsgBuilder.WithContent(aMessage);
-        await _discord.GetChannelAsync(BotTestChannelID).Result.SendMessageAsync(lmsgBuilder);
+        await _discord.GetChannelAsync(aChannelID).Result.SendMessageAsync(lmsgBuilder);
     }
 }

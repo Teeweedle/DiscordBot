@@ -1,6 +1,5 @@
 using DSharpPlus.Entities;
 using Microsoft.Data.Sqlite;
-using NUnit.Framework.Constraints;
 public class DatabaseHelper
 {
     private static readonly string _folderPath = Path.Combine(AppContext.BaseDirectory, "data");
@@ -55,7 +54,8 @@ public class DatabaseHelper
 
         
         lCmd.Parameters.AddWithValue("$ReactionCount", aMessage.Reactions.Count);
-        lCmd.Parameters.AddWithValue("$Timestamp", aMessage.CreationTimestamp.ToString("o"));
+        lCmd.Parameters.AddWithValue("$Timestamp", 
+                    aMessage.CreationTimestamp.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss"));
 
         lCmd.ExecuteNonQuery();
     }
@@ -63,17 +63,14 @@ public class DatabaseHelper
     /// Returns all messages from the database that share today's date
     /// </summary>
     /// <returns>List of MessageRecords</returns>
-    public List<MessageRecord> GetTodaysMsgs(DateTime aDate)
+    public List<MessageRecord> GetTodaysMsgs(DateTime aCurrentDate)
     {
-        var lStartUTC = new DateTime(aDate.Year, aDate.Month, aDate.Day, 0, 0, 0, DateTimeKind.Utc);
-        var lEndUTC = lStartUTC.AddDays(1);
-
         using var lConnection = new SqliteConnection(_messagesConnectionString);
         lConnection.Open();
 
-        var lYearsWithMessages = GetYearsWithMessages(lConnection, lStartUTC, lEndUTC);
+        List<int> lYearsWithMessages = GetYearsWithMessages(lConnection, aCurrentDate);
         
-        var lMessages = new List<MessageRecord>();
+        List<MessageRecord> lMessages = new List<MessageRecord>();
         if (lYearsWithMessages.Count == 0)//If there are no years with messages
             return new List<MessageRecord>();
             
@@ -84,13 +81,13 @@ public class DatabaseHelper
         lCmd.CommandText = @"
                             SELECT *
                             FROM Messages
-                            WHERE strftime('%m', Timestamp, 'utc') = $Month
-                                AND strftime('%d', Timestamp, 'utc') = $Day
-                                AND strftime('%Y', Timestamp, 'utc') = $Year
+                            WHERE strftime('%m', Timestamp) = $Month
+                                AND strftime('%d', Timestamp) = $Day
+                                AND strftime('%Y', Timestamp) = $Year
                                 AND (LENGTH(Content) > 3 OR AttachmentCount > 0)";
-        lCmd.Parameters.AddWithValue("$Month", aDate.Month.ToString("D2")); 
-        lCmd.Parameters.AddWithValue("$Day", aDate.Day.ToString("D2"));
-        lCmd.Parameters.AddWithValue("$Year", lYear);
+        lCmd.Parameters.AddWithValue("$Month", aCurrentDate.Month.ToString("D2")); 
+        lCmd.Parameters.AddWithValue("$Day", aCurrentDate.Day.ToString("D2"));
+        lCmd.Parameters.AddWithValue("$Year", lYear.ToString());
         
         using var lReader = lCmd.ExecuteReader();
         while (lReader.Read())
@@ -105,26 +102,33 @@ public class DatabaseHelper
                 AttachmentCount = lReader.GetInt32(lReader.GetOrdinal("AttachmentCount")),
                 ReactionCount = lReader.GetInt32(lReader.GetOrdinal("ReactionCount")),
                 Timestamp = DateTime.Parse(lReader.GetString(lReader.GetOrdinal("Timestamp")), 
-                                                null, System.Globalization.DateTimeStyles.AdjustToUniversal)
+                                                null, System.Globalization.DateTimeStyles.AssumeLocal)
             });
         }      
 
         return lMessages;
     }
-    private List<int> GetYearsWithMessages(SqliteConnection aConnection, DateTime aStartUTC, DateTime aEndUTC)
-    {
-        
-        var lYearsWithMessages = new List<int>();
 
+    /// <summary>
+    /// Returns a list of years that have messages exluding the current year
+    /// </summary>
+    /// <param name="aConnection"></param>
+    /// <param name="aCurrentDate">The date to check</param>
+    /// <returns></returns>
+    private List<int> GetYearsWithMessages(SqliteConnection aConnection, DateTime aCurrentDate)
+    {        
+        var lYearsWithMessages = new List<int>();
         using(var lCmd = aConnection.CreateCommand())
         {
             lCmd.CommandText = @"
                                 SELECT DISTINCT strftime('%Y', Timestamp) as Year
                                 FROM Messages
-                                WHERE Timestamp BETWEEN $start AND $end
+                                WHERE strftime('%m', Timestamp) = $Month
+                                    AND strftime('%d', Timestamp) = $Day
+                                    And strftime('%Y', Timestamp) != $CurrentYear
                                 ORDER BY Random()";
-            lCmd.Parameters.AddWithValue("$start", aStartUTC.ToString("yyyy-MM-ddTHH:mm:ss"));
-            lCmd.Parameters.AddWithValue("$end", aEndUTC.ToString("yyyy-MM-ddTHH:mm:ss"));
+            lCmd.Parameters.AddWithValue("$Month", aCurrentDate.Month.ToString("D2"));
+            lCmd.Parameters.AddWithValue("$Day", aCurrentDate.Day.ToString("D2"));
 
             using var lYearReader = lCmd.ExecuteReader();
             while (lYearReader.Read())
@@ -180,6 +184,10 @@ public class DatabaseHelper
         lCmd.Parameters.AddWithValue("$WeightedChannelID", aChannelID);
         lCmd.ExecuteNonQuery();
     }
+    /// <summary>
+    /// Returns weighted channel ID from ChannelInfo.db
+    /// </summary>
+    /// <returns></returns>
     public string? GetWeightedChannelID()
     {
         using var lConnection = new SqliteConnection(_channelInfoConnectionString);
@@ -195,6 +203,10 @@ public class DatabaseHelper
         var result = lCmd.ExecuteScalar();
         return result?.ToString();          
     }
+    /// <summary>
+    /// Returns MOTD channel ID from ChannelInfo.db
+    /// </summary>
+    /// <returns></returns>
     public string? GetMoTDChannelID()
     {
         using var lConnection = new SqliteConnection(_channelInfoConnectionString);
@@ -255,10 +267,18 @@ public class DatabaseHelper
         lCmd.Parameters.AddWithValue("$WebhookToken", aWebhookToken);
         lCmd.ExecuteNonQuery();
     }
+    /// <summary>
+    /// Returns webhook ID from WebhookInfo.db
+    /// </summary>
+    /// <param name="aGuildID"></param>
+    /// <param name="aChannelID"></param>
+    /// <returns></returns>
     public string? GetWebHookID(string aGuildID, string aChannelID)
     {
         using var lConnection = new SqliteConnection(_webhookInfoConnectionString);
         lConnection.Open();
+
+        CheckWebHookTableExists(lConnection);
 
         string lSql = @"
             SELECT WebhookID 
@@ -272,6 +292,12 @@ public class DatabaseHelper
         var result = lCmd.ExecuteScalar();
         return result?.ToString();
     }
+    /// <summary>
+    /// Returns webhook token from WebhookInfo.db
+    /// </summary>
+    /// <param name="aGuildID"></param>
+    /// <param name="aChannelID"></param>
+    /// <returns></returns>
     public string? GetWebHookToken(string aGuildID, string aChannelID)
     {
         using var lConnection = new SqliteConnection(_webhookInfoConnectionString);

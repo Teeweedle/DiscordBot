@@ -5,7 +5,7 @@
         Console.WriteLine("Bot is starting... ");
 
         var MOTDService = new OnThisDayService();
-        var today = DateTime.UtcNow.Date;
+        // var today = DateTime.UtcNow.Date;
 
         string? token = Environment.GetEnvironmentVariable("DISCORD_BOT_TOKEN");
         if (string.IsNullOrWhiteSpace(token))
@@ -15,7 +15,8 @@
 
         if (args.Length > 0 && args[0].Equals("postmotd", StringComparison.OrdinalIgnoreCase))
         {
-            await bot.PostMotDAsync();
+            bool testMode = args.Length > 1 && args[1].Equals("test", StringComparison.OrdinalIgnoreCase);
+            await bot.PostMotDAsync(testMode);
             return;
         }
 
