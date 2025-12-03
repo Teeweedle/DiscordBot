@@ -108,7 +108,6 @@ public class DatabaseHelper
 
         return lMessages;
     }
-
     /// <summary>
     /// Returns a list of years that have messages exluding the current year
     /// </summary>
@@ -138,6 +137,38 @@ public class DatabaseHelper
             }
         }
         return lYearsWithMessages;
+    }
+    public List<MessageRecord> GetLast24HoursMsgs(DateTime aCurrentDate)
+    {
+        List<MessageRecord> lMessageList = new List<MessageRecord>();
+        using SqliteConnection lConnection = new SqliteConnection(_messagesConnectionString);
+        lConnection.Open();
+
+        using SqliteCommand lCmd = lConnection.CreateCommand();
+        lCmd.CommandText = @"
+                            SELECT *
+                            FROM Messages
+                            WHERE Timestamp >= $Cutoff)";
+        DateTime lCutoff = aCurrentDate.AddDays(-1);
+        lCmd.Parameters.AddWithValue("$Cutoff", lCutoff.ToString("yyyy-MM-dd HH:mm:ss"));
+        using var lReader = lCmd.ExecuteReader();
+        while (lReader.Read())
+        {
+            MessageRecord lMessage = new MessageRecord
+            {
+                MessageID = lReader.GetString(lReader.GetOrdinal("MessageID")),
+                GuildID = lReader.GetString(lReader.GetOrdinal("GuildID")),
+                ChannelID = lReader.GetString(lReader.GetOrdinal("ChannelID")),
+                AuthorID = lReader.GetString(lReader.GetOrdinal("AuthorID")),
+                Content = lReader.GetString(lReader.GetOrdinal("Content")),
+                AttachmentCount = lReader.GetInt32(lReader.GetOrdinal("AttachmentCount")),
+                ReactionCount = lReader.GetInt32(lReader.GetOrdinal("ReactionCount")),
+                Timestamp = DateTime.Parse(lReader.GetString(lReader.GetOrdinal("Timestamp")), 
+                                                null, System.Globalization.DateTimeStyles.AssumeLocal)
+            };
+            lMessageList.Add(lMessage);
+        }
+        return lMessageList;
     }
     /// <summary>
     /// Sets MOTD channel for this guild. Saves it to database located in data folder ChannelInfo.db

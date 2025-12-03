@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using DSharpPlus;
 using DSharpPlus.Entities;
 using DSharpPlus.SlashCommands;
@@ -311,5 +310,9 @@ public class BotService
             lNewMessage.ReactionCount += aMessages[i].ReactionCount;
         }        
         return lNewMessage;
+    }
+    public async Task PostChannelSummaryAsync(bool testMode = false)
+    {
+        //TODO: Set channel for channel summary
     }
 }
