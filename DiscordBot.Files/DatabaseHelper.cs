@@ -129,6 +129,7 @@ public class DatabaseHelper
                                 ORDER BY Random()";
             lCmd.Parameters.AddWithValue("$Month", aCurrentDate.Month.ToString("D2"));
             lCmd.Parameters.AddWithValue("$Day", aCurrentDate.Day.ToString("D2"));
+            lCmd.Parameters.AddWithValue("$CurrentYear", aCurrentDate.Year.ToString());
 
             using var lYearReader = lCmd.ExecuteReader();
             while (lYearReader.Read())

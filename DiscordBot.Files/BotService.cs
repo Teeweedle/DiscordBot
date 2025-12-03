@@ -156,12 +156,12 @@ public class BotService
     }
     public async Task PostMotDAsync(bool testMode = false)
     {
-        Console.WriteLine("Posting MOTD...");
+        Console.WriteLine($"Posting MOTD... (Test Mode: {testMode})");
         var MOTDService = new OnThisDayService();
         ulong lChannelID;
 
         List<MessageRecord> lMessages = _dbh.GetTodaysMsgs(DateTime.UtcNow.Date);
-
+        List<MessageRecord> lMergedMessages = MergeMultiPartMessages(lMessages);
         if (testMode)
         {
             lChannelID = BotTestChannelID;
@@ -177,40 +177,40 @@ public class BotService
             lChannelID = ulong.Parse(lmotdID);   
         }
         
-        if (lMessages.Count == 0)
+        if (lMergedMessages.Count == 0)
         {
             await SendMessage("Today is a slow day in history. No messages were found for today.", lChannelID);
             return;
         }
-        DiscordChannel lChannel = await _discord.GetChannelAsync(lChannelID);   
-    
-        var lBestMsg = MOTDService.GetMotD(lMessages, _dbh.GetWeightedChannelID()!);
+        string? lWeightedChannelID = _dbh.GetWeightedChannelID();
+        var lBestMsg = MOTDService.GetMotD(lMergedMessages, lWeightedChannelID ?? string.Empty);
+        if(lBestMsg == null)
+        {
+            await SendMessage("No message found for today.", lChannelID);
+            return;
+        }
         var lSourceChannel = await _discord.GetChannelAsync(ulong.Parse(lBestMsg.ChannelID));
         var lOriginalMsg = await lSourceChannel.GetMessageAsync(ulong.Parse(lBestMsg.MessageID));
 
-        if (lBestMsg != null)
-        {
-            if(lChannel is DiscordChannel)
-            {                
-                await SendMessage(lOriginalMsg, lChannelID);    
-            }            
-        }
+        await SendMessage(lOriginalMsg, lBestMsg, lChannelID);                         
     }
     /// <summary>
     /// Formats and sends a message using a webhook
     /// </summary>
-    /// <param name="aMessage"></param>
-    /// <param name="aChannelID">Channel to send to</param>
+    /// <param name="aMessage">The Original message</param>
+    /// <param name="aBestMsg">Best message with grouped content</param>
+    /// <param name="aChannelID"></param>
     /// <returns></returns>
-    private async Task SendMessage(DiscordMessage aMessage, ulong aChannelID)
+    private async Task SendMessage(DiscordMessage aMessage, MessageRecord aBestMsg, ulong aChannelID)
     {
         var lWebHook = await EnsureAvailableWebhookAsync(aChannelID);  
         var lBot = await _discord.GetUserAsync(BotID);  
         
         var lWebHookBuilder = new DiscordWebhookBuilder()
-            .WithUsername($"\nOn this day in {aMessage.CreationTimestamp.Year}")
-            .WithContent($"<@{aMessage.Author.Id}> said: \n"+
-                $"{aMessage.Content} \n\n")
+            .WithUsername($"\nOn this day in {aBestMsg.Timestamp.Year}")
+            .WithContent($"------------------------------------------------\n" + 
+                $"<@{aBestMsg.AuthorID}> said: \n"+
+                $"{aBestMsg.Content} \n\n")
             .WithAvatarUrl(lBot.AvatarUrl);
             
         foreach (var attachment in aMessage.Attachments)
@@ -221,8 +221,9 @@ public class BotService
         await lWebHook.ExecuteAsync(lWebHookBuilder);
 
         var lFooter = new DiscordWebhookBuilder()
-            .WithUsername($"On this day in {aMessage.CreationTimestamp.Year}")
-            .WithContent($"[view orignal message]({aMessage.JumpLink})")
+            .WithUsername($"On this day in {aBestMsg.Timestamp.Year}")
+            .WithContent($"------------------------------------------------\n" 
+                + $"[view orignal message]({aMessage.JumpLink})")
             .WithAvatarUrl(lBot.AvatarUrl);
         await lWebHook.ExecuteAsync(lFooter);
     }
@@ -237,5 +238,78 @@ public class BotService
         var lmsgBuilder = new DiscordMessageBuilder();
         lmsgBuilder.WithContent(aMessage);
         await _discord.GetChannelAsync(aChannelID).Result.SendMessageAsync(lmsgBuilder);
+    }
+    /// <summary>
+    /// Groups messages from the same user within 7 minutes
+    /// </summary>
+    /// <param name="aMessages">A list of messages to be checked for similarity</param>
+    /// <returns>A list of messages that have been merged based on timestamp and author</returns>
+    private List<MessageRecord> MergeMultiPartMessages(List<MessageRecord> aMessages)
+    {
+        if (aMessages.Count == 0)
+            return aMessages;
+        List<MessageRecord> lSortedMessages = aMessages
+            .OrderBy(m => m.Timestamp)
+            .ToList();
+
+        List<MessageRecord> lMergedMessages = new List<MessageRecord>();
+
+        int i = 0;
+        while(i < lSortedMessages.Count)
+        {
+            MessageRecord lStartNewMessage = lSortedMessages[i];
+            List<MessageRecord> lGroup = new List<MessageRecord>();
+            lGroup.Add(lStartNewMessage);
+
+            int j = i + 1;
+            while(j < lSortedMessages.Count)
+            {
+                MessageRecord lNextMessage = lSortedMessages[j];
+                
+                bool lSameAuthor = lStartNewMessage.AuthorID == lNextMessage.AuthorID;
+                //current message is within 7 minutes of the first message
+                bool lWithin7Minutes = (lNextMessage.Timestamp - lStartNewMessage.Timestamp).TotalMinutes <= 7; 
+                
+                if(!lSameAuthor || !lWithin7Minutes)
+                    break;
+
+                lGroup.Add(lNextMessage);
+                j++;
+            }
+
+            lMergedMessages.Add(CollapseMessageContent(lGroup));
+            i = j;            
+        }
+
+        return lMergedMessages;
+    }
+    /// <summary>
+    /// Combines multiple messages into one
+    /// </summary>
+    /// <param name="aMessages">A list of messages from the same user within 7 minutes</param>
+    /// <returns>A combined message</returns>
+    private MessageRecord CollapseMessageContent(List<MessageRecord> aMessages)
+    {
+        MessageRecord lFirstMessage = aMessages[0];
+
+        MessageRecord lNewMessage = new MessageRecord
+        {
+            Content = lFirstMessage.Content,
+            AttachmentCount = lFirstMessage.AttachmentCount,
+            ReactionCount = lFirstMessage.ReactionCount,
+            Timestamp = lFirstMessage.Timestamp,
+            MessageID = lFirstMessage.MessageID,
+            GuildID = lFirstMessage.GuildID,
+            ChannelID = lFirstMessage.ChannelID,
+            AuthorID = lFirstMessage.AuthorID,
+            Interestingness = lFirstMessage.Interestingness
+        };
+        for(int i = 1; i < aMessages.Count; i++)
+        {
+            lNewMessage.Content += "\n" + aMessages[i].Content;
+            lNewMessage.AttachmentCount += aMessages[i].AttachmentCount;
+            lNewMessage.ReactionCount += aMessages[i].ReactionCount;
+        }        
+        return lNewMessage;
     }
 }
