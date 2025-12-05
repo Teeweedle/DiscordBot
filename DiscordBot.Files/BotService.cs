@@ -2,12 +2,14 @@ using DSharpPlus;
 using DSharpPlus.Entities;
 using DSharpPlus.SlashCommands;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Configuration;
 
 public class BotService
 {
     private readonly string _token;
     private readonly DiscordClient _discord;
     private readonly DatabaseHelper _dbh = new();
+    private readonly string _cohereKey;
     private readonly ulong BotTestChannelID = 1445164447093227633;
     private readonly ulong BotID = 1428047784245854310;
     private static readonly HttpClient _httpClient = new HttpClient();
@@ -21,6 +23,9 @@ public class BotService
             TokenType = TokenType.Bot,
             Intents = DiscordIntents.AllUnprivileged | DiscordIntents.MessageContents
         });
+        IConfigurationBuilder lBuilder = new ConfigurationBuilder().AddUserSecrets<Program>();
+        IConfiguration lConfig = lBuilder.Build();
+        _cohereKey = lConfig["COHERE_API_KEY"] ?? throw new Exception("COHERE_API_KEY is not set");
     }
     public void RegisterCommands()
     {
@@ -190,8 +195,9 @@ public class BotService
         }
         var lSourceChannel = await _discord.GetChannelAsync(ulong.Parse(lBestMsg.ChannelID));
         var lOriginalMsg = await lSourceChannel.GetMessageAsync(ulong.Parse(lBestMsg.MessageID));
+        var lMotDFormat = MotDFormatter(lOriginalMsg, lBestMsg);
 
-        await SendMessage(lOriginalMsg, lBestMsg, lChannelID);                         
+        await SendMessage(lOriginalMsg, lChannelID, lMotDFormat);                         
     }
     /// <summary>
     /// Formats and sends a message using a webhook
@@ -200,37 +206,43 @@ public class BotService
     /// <param name="aBestMsg">Best message with grouped content</param>
     /// <param name="aChannelID"></param>
     /// <returns></returns>
-    private async Task SendMessage(DiscordMessage aMessage, MessageRecord aBestMsg, ulong aChannelID)
+    private async Task SendMessage(DiscordMessage? aMessage, 
+                        ulong aChannelID,
+                        (string userName, string content, string? footer) aFormat)
     {
         var lWebHook = await EnsureAvailableWebhookAsync(aChannelID);  
-        var lBot = await _discord.GetUserAsync(BotID);  
+        var lBot = await _discord.GetUserAsync(BotID);
         
         var lWebHookBuilder = new DiscordWebhookBuilder()
-            .WithUsername($"\nOn this day in {aBestMsg.Timestamp.Year}")
-            .WithContent($"------------------------------------------------\n" + 
-                $"<@{aBestMsg.AuthorID}> said: \n"+
-                $"{aBestMsg.Content} \n\n")
+            .WithUsername(aFormat.userName)
+            .WithContent(aFormat.content)
             .WithAvatarUrl(lBot.AvatarUrl);
-            
-        foreach (var attachment in aMessage.Attachments)
+
+        if(aMessage != null)
         {
-            var lStream = await _httpClient.GetStreamAsync(attachment.Url);
-            lWebHookBuilder.AddFile(attachment.FileName, lStream);
-        }
+           foreach (var attachment in aMessage.Attachments)
+            {
+                var lStream = await _httpClient.GetStreamAsync(attachment.Url);
+                lWebHookBuilder.AddFile(attachment.FileName, lStream);
+            } 
+        }    
+        
         await lWebHook.ExecuteAsync(lWebHookBuilder);
 
-        var lFooter = new DiscordWebhookBuilder()
-            .WithUsername($"On this day in {aBestMsg.Timestamp.Year}")
-            .WithContent($"------------------------------------------------\n" 
-                + $"[view orignal message]({aMessage.JumpLink})")
-            .WithAvatarUrl(lBot.AvatarUrl);
-        await lWebHook.ExecuteAsync(lFooter);
+        if (!string.IsNullOrEmpty(aFormat.footer))
+        {
+            var lFooterBuilder = new DiscordWebhookBuilder()
+                .WithUsername(aFormat.userName)
+                .WithContent(aFormat.footer)
+                .WithAvatarUrl(lBot.AvatarUrl);
+            await lWebHook.ExecuteAsync(lFooterBuilder);
+        }
     }
     /// <summary>
-    /// Formats and sends a message using DiscordMessageBuilder
+    /// Formats and sends a message using DiscordMessageBuilder, generally used if no channels are set
     /// </summary>
     /// <param name="aMessage"></param>
-    /// <param name="aChannelID">Channel to send to</param>
+    /// <param name="aChannelID">Default Channel</param>
     /// <returns></returns>
     private async Task SendMessage(string aMessage, ulong aChannelID)
     {
@@ -313,6 +325,57 @@ public class BotService
     }
     public async Task PostChannelSummaryAsync(bool testMode = false)
     {
-        //TODO: Set channel for channel summary
+        Console.WriteLine($"Posting channel summary... (Test Mode: {testMode})");
+        List<MessageRecord> lMessages =  _dbh.GetLast24HoursMsgs(DateTime.Now, "429063504725671950");
+
+        CohereClient lCohere = new CohereClient(_cohereKey);
+        string lContent = string.Empty;
+        ulong lChannelID;
+
+        foreach (var m in lMessages)
+        {
+            lContent += " ";
+            lContent += m.Content.Replace("\n", " ");
+        }
+        lContent = "This is a test to make sure the string isn't too long";
+        string lPrompt = $"Summarize the following text: {lContent}";
+        string lResponse = await lCohere.AskAsync(lPrompt);
+
+        if (testMode)
+        {
+            lChannelID = BotTestChannelID;
+        }
+        else
+        {
+            string? lTLDRChannelID = _dbh.GetTLDRChannelID()!;
+            lChannelID = ulong.Parse(lTLDRChannelID);
+        }
+        if(string.IsNullOrEmpty(lResponse))
+        {
+            await SendMessage("No response from Cohere.", lChannelID);
+            return;
+        }
+        var lTLDRFormat = TLDRFormatter(lResponse);
+        await SendMessage(null, lChannelID, lTLDRFormat);
+    }
+    public static (string, string, string?) MotDFormatter(DiscordMessage aMsg, MessageRecord aBestMsg)
+    {
+        string lUserName = $"\nOn this day in {aBestMsg.Timestamp.Year}";
+        string lContent = $"------------------------------------------------\n" 
+                + $"<@{aBestMsg.AuthorID}> said: \n"
+                + $"{aBestMsg.Content} \n\n";
+        string lFooter = $"------------------------------------------------\n" 
+                + $"[view orignal message]({aMsg.JumpLink})";
+
+        return (lUserName, lContent, lFooter);
+    }
+    public static (string, string, string?) TLDRFormatter(string aMsg)
+    {
+        string lUserName = $"\nToday's TLDR:";
+        string lContent = $"------------------------------------------------\n" 
+                + $"{aMsg}";
+        string lFooter = string.Empty;
+
+        return (lUserName, lContent, lFooter);
     }
 }

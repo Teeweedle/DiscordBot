@@ -53,7 +53,7 @@ public class MyCommands : ApplicationCommandModule
     /// <param name="ctx"></param>
     /// <returns></returns>
     [SlashCommand("GetCurrentWeightedChannel", "Get current MotD weighted channel.")]
-    public async Task CurrentWeightedChannelCommand(InteractionContext ctx)
+    public async Task GetCurrentWeightedChannelCommand(InteractionContext ctx)
     {
         var ldb = ctx.Services.GetRequiredService<DatabaseHelper>();
         if(ctx.Guild == null)
@@ -70,6 +70,50 @@ public class MyCommands : ApplicationCommandModule
         var channel = await ctx.Client.GetChannelAsync(ulong.Parse(lChannelID));
 
         await ctx.CreateResponseAsync($"Current weighted channel is {channel?.Name}.");
+    }
+    [SlashCommand("SetTLDRChannel", "Set TLDR channel for this guild. Requires admin permissions.")]
+    public async Task SetTLDRChannelCommand(InteractionContext ctx, [Option("channel", "Channel to set")] DiscordChannel aChannel)
+    {
+        try
+        {
+            var lDB = ctx.Services.GetRequiredService<DatabaseHelper>();
+    
+            if (!ctx.Member.Permissions.HasPermission(Permissions.Administrator))
+            {
+                await ctx.CreateResponseAsync("You must be an admin to use this command.");
+                return;
+            }
+    
+            lDB.SetTLDRChannel(ctx.Guild.Id.ToString(), aChannel.Id.ToString());
+    
+            await ctx.CreateResponseAsync($"Set TLDR channel to {aChannel.Name}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[SetTLDRChannel Error] {ex.GetType().Name}: {ex.Message}");            
+        }
+    }
+    [SlashCommand("GetTLDRChannel", "Get TLDR channel for this guild. Requires admin permissions.")]
+    public async Task GetTLDRChannelCommand(InteractionContext ctx)
+    {
+        var lDB = ctx.Services.GetRequiredService<DatabaseHelper>();
+
+        if (!ctx.Member.Permissions.HasPermission(Permissions.Administrator))
+        {
+            await ctx.CreateResponseAsync("You must be an admin to use this command.");
+            return;
+        }
+
+        string? lChannelID = lDB.GetTLDRChannelID();
+        if (string.IsNullOrEmpty(lChannelID))
+        {
+            await ctx.CreateResponseAsync("No TLDR channel set.");
+            return;
+        }
+
+        var channel = await ctx.Client.GetChannelAsync(ulong.Parse(lChannelID));
+
+        await ctx.CreateResponseAsync($"Current TLDR channel is {channel?.Name}.");
     }
     [SlashCommand("otd", "Get today's On This Day message")]
     public async Task OTDCommand(InteractionContext ctx)

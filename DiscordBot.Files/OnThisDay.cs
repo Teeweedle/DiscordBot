@@ -2,11 +2,11 @@ using System.Text.RegularExpressions;
 
 public class OnThisDay
 {
-    private const float AttachmentMultiplier = 2.5f;
-    private const float WordCountMultiplier = 0.35f;
+    private const float AttachmentMultiplier = 3.5f;
+    private const float WordCountMultiplier = 0.1f;
     private const float MentionsUserMultiplier = 0.3f;
-    private const float ReactionCountMultiplier = 0.25f;
-    private const float weightedChannelMultiplier = 3.5f;    
+    private const float ReactionCountMultiplier = 1.25f;
+    private const float weightedChannelMultiplier = 5.5f;    
     private static readonly Regex MediaLinkRegex = new Regex(
         @"https?:\/\/(?:[^\s]+?\.(?:gif|mp3|mp4|png|jpg|jpeg|webm)|(?:www\.)?(?:reddit\.com|v\.redd\.it|imgur\.com|gfycat\.com|tenor\.com|youtube\.com|youtu\.be)[^\s]*)",
         RegexOptions.IgnoreCase | RegexOptions.Compiled

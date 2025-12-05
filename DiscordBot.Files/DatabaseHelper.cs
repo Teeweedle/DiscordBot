@@ -138,7 +138,7 @@ public class DatabaseHelper
         }
         return lYearsWithMessages;
     }
-    public List<MessageRecord> GetLast24HoursMsgs(DateTime aCurrentDate)
+    public List<MessageRecord> GetLast24HoursMsgs(DateTime aCurrentDate, string aChannelID)
     {
         List<MessageRecord> lMessageList = new List<MessageRecord>();
         using SqliteConnection lConnection = new SqliteConnection(_messagesConnectionString);
@@ -148,9 +148,11 @@ public class DatabaseHelper
         lCmd.CommandText = @"
                             SELECT *
                             FROM Messages
-                            WHERE Timestamp >= $Cutoff)";
-        DateTime lCutoff = aCurrentDate.AddDays(-1);
+                            WHERE Timestamp >= $Cutoff
+                            AND ChannelID = $ChannelID";
+        DateTime lCutoff = aCurrentDate.ToUniversalTime().AddDays(-1);
         lCmd.Parameters.AddWithValue("$Cutoff", lCutoff.ToString("yyyy-MM-dd HH:mm:ss"));
+        lCmd.Parameters.AddWithValue("$ChannelID", aChannelID);
         using var lReader = lCmd.ExecuteReader();
         while (lReader.Read())
         {
@@ -217,6 +219,44 @@ public class DatabaseHelper
         lCmd.ExecuteNonQuery();
     }
     /// <summary>
+    /// Sets TLDR channel for this guild. Saves it to database located in data folder ChannelInfo.db. 
+    /// AI will post a summary of messages from General in this channel
+    /// <param name="aGuildID"></param>
+    /// <param name="aChannelID">Channel to post TLDR</param>
+    public void SetTLDRChannel(string aGuildID, string aChannelID)
+    {
+        using var lConnection = new SqliteConnection(_channelInfoConnectionString);
+        lConnection.Open();
+
+        CheckChannelTableExists(lConnection);
+
+        string lInsertCmd = @"
+            INSERT INTO ChannelInfo (GuildID, TLDRChannelID) 
+            VALUES ($GuildID, $TLDRChannelID) 
+            ON CONFLICT (GuildID) DO UPDATE SET TLDRChannelID = $TLDRChannelID";
+
+        using var lCmd = new SqliteCommand(lInsertCmd, lConnection);
+
+        lCmd.Parameters.AddWithValue("$GuildID", aGuildID);
+        lCmd.Parameters.AddWithValue("$TLDRChannelID", aChannelID);
+        lCmd.ExecuteNonQuery();
+    }
+    public string? GetTLDRChannelID()
+    {
+        using var lConnection = new SqliteConnection(_channelInfoConnectionString);
+        lConnection.Open();
+
+        string lSql = @"
+            SELECT TLDRChannelID 
+            FROM ChannelInfo 
+            LIMIT 1";
+            
+        using var lCmd = new SqliteCommand(lSql, lConnection);
+        
+        var result = lCmd.ExecuteScalar();
+        return result?.ToString();        
+    }
+    /// <summary>
     /// Returns weighted channel ID from ChannelInfo.db
     /// </summary>
     /// <returns></returns>
@@ -260,7 +300,8 @@ public class DatabaseHelper
             CREATE TABLE IF NOT EXISTS ChannelInfo (
                 GuildID TEXT PRIMARY KEY,
                 WeightedChannelID TEXT,
-                MoTDChannelID TEXT
+                MoTDChannelID TEXT,
+                TLDRChannelID TEXT
             )";
         using var createCmd = new SqliteCommand(lTableCmd, aConnection);
         createCmd.ExecuteNonQuery();
