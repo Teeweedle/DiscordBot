@@ -337,7 +337,7 @@ public class BotService
             lContent += " ";
             lContent += m.Content.Replace("\n", " ");
         }
-        lContent = "This is a test to make sure the string isn't too long";
+        
         string lPrompt = $"Summarize the following text: {lContent}";
         string lResponse = await lCohere.AskAsync(lPrompt);
 

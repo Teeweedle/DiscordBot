@@ -1,7 +1,7 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 public class CohereClient
 {
@@ -10,7 +10,7 @@ public class CohereClient
     public CohereClient(string apiKey)
     {
         _http = new HttpClient();
-        _http.BaseAddress = new Uri("https://api.cohere.com/v1/");
+        _http.BaseAddress = new Uri("https://api.cohere.ai/v1/");
         _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
         _http.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
     }
@@ -22,24 +22,15 @@ public class CohereClient
 
         try
         {
-            var request = new
+            var request = new CohereChatRequest
             {
-                model = "command-r-plus",   
-                messages = new[]
-                {
-                    new
-                    {
-                        role = "user",
-                        content = aPrompt
-                    }
-                },
-                max_tokens = 300,
-                temperature = 0.3
+                Model = "command-a-03-2025",   
+                Message = aPrompt,
+                MaxTokens = 300,
+                Temperature = 0.3
             };
-            string jsonString = JsonSerializer.Serialize(request);
-            StringContent content = new StringContent(jsonString, Encoding.UTF8, "application/json");
-            HttpResponseMessage lResponse = await _http.PostAsJsonAsync("chat", content);
 
+            HttpResponseMessage lResponse = await _http.PostAsJsonAsync("chat", request);
             string body = await lResponse.Content.ReadAsStringAsync();
 
             if (!lResponse.IsSuccessStatusCode)
@@ -48,11 +39,10 @@ public class CohereClient
                 Console.WriteLine(body);
                 return string.Empty;
             }
+            Console.WriteLine(body);
+            var chatResponse = JsonSerializer.Deserialize<CohereChatResponse>(body);
 
-            // Deserialize
-            CohereChatResponse? json = JsonSerializer.Deserialize<CohereChatResponse>(body);
-
-            return json?.choices?[0]?.message?.content ?? string.Empty;
+            return chatResponse?.Text ?? string.Empty;
         }
         catch (Exception ex)
         {
@@ -62,19 +52,88 @@ public class CohereClient
         }
     }
 }
+public class CohereChatRequest
+{
+    [JsonPropertyName("model")]
+    public string Model { get; set; }
 
+    [JsonPropertyName("message")]
+    public string Message { get; set; }
+
+    [JsonPropertyName("chat_history")]
+    public List<ChatHistoryItem> ChatHistory { get; set; }
+
+    [JsonPropertyName("max_tokens")]
+    public int MaxTokens { get; set; }
+
+    [JsonPropertyName("temperature")]
+    public double Temperature { get; set; }
+}
 public class CohereChatResponse
 {
-    public List<Choice>? choices { get; set; }
+    [JsonPropertyName("response_id")]
+    public string ResponseId { get; set; }
+
+    [JsonPropertyName("text")]
+    public string Text { get; set; }
+
+    [JsonPropertyName("generation_id")]
+    public string GenerationId { get; set; }
+
+    [JsonPropertyName("chat_history")]
+    public List<ChatHistoryItem> ChatHistory { get; set; }
+
+    [JsonPropertyName("finish_reason")]
+    public string FinishReason { get; set; }
+
+    [JsonPropertyName("meta")]
+    public Meta Meta { get; set; }
 }
 
-public class Choice
+public class ChatHistoryItem
 {
-    public Message? message { get; set; }
+    [JsonPropertyName("role")]
+    public string Role { get; set; }   
+
+    [JsonPropertyName("message")]
+    public string Message { get; set; }
 }
 
-public class Message
+public class Meta
 {
-    public string? role { get; set; }
-    public string? content { get; set; }
+    [JsonPropertyName("api_version")]
+    public ApiVersion ApiVersion { get; set; }
+
+    [JsonPropertyName("billed_units")]
+    public BilledUnits BilledUnits { get; set; }
+
+    [JsonPropertyName("tokens")]
+    public Tokens Tokens { get; set; }
+
+    [JsonPropertyName("cached_tokens")]
+    public int CachedTokens { get; set; }
+}
+
+public class ApiVersion
+{
+    [JsonPropertyName("version")]
+    public string Version { get; set; }
+}
+
+public class BilledUnits
+{
+    [JsonPropertyName("input_tokens")]
+    public int InputTokens { get; set; }
+
+    [JsonPropertyName("output_tokens")]
+    public int OutputTokens { get; set; }
+}
+
+public class Tokens
+{
+    [JsonPropertyName("input_tokens")]
+    public int InputTokens { get; set; }
+
+    [JsonPropertyName("output_tokens")]
+    public int OutputTokens { get; set; }
 }
