@@ -6,9 +6,11 @@ public class DatabaseHelper
     private static readonly string _messagesDBPath = Path.Combine(_folderPath, "Messages.db");
     private static readonly string _channelInfoDBPath = Path.Combine(_folderPath, "ChannelInfo.db");
     private static readonly string _webhookInfoDBPath = Path.Combine(_folderPath, "WebhookInfo.db");
+    private static readonly string _targetUserAndChannelDBPath = Path.Combine(_folderPath, "TargetUserAndChannel.db");
     private readonly string _messagesConnectionString = $"Data Source={_messagesDBPath}";
     private string _channelInfoConnectionString = $"Data Source={_channelInfoDBPath}";
     private string _webhookInfoConnectionString = $"Data Source={_webhookInfoDBPath}";
+    private string _targetUserAndChannelConnectionString = $"Data Source={_targetUserAndChannelDBPath}";
 
     public DatabaseHelper(string? aConnectionString = null)
     {
@@ -387,5 +389,64 @@ public class DatabaseHelper
         
         var result = lCmd.ExecuteScalar();
         return result?.ToString();
+    }
+    public void SetTargetUserAndChannel(string aUserID, string aChannelID)
+    {
+        using var lConnection = new SqliteConnection(_targetUserAndChannelConnectionString);
+        lConnection.Open();
+
+        CheckIfTargetUserAndChannelSet(lConnection);
+
+        string lInsertCmd = @"
+            INSERT INTO TargetUserAndChannel (ID, UserID, ChannelID) 
+            VALUES (1, $UserID, $ChannelID) 
+            ON CONFLICT (ID) DO UPDATE SET 
+                UserID = $UserID, 
+                ChannelID = $ChannelID";
+
+        using var lCmd = new SqliteCommand(lInsertCmd, lConnection);
+
+        lCmd.Parameters.AddWithValue("$UserID", aUserID);
+        lCmd.Parameters.AddWithValue("$ChannelID", aChannelID);
+        lCmd.ExecuteNonQuery();
+    }
+    public string? GetTargetChannelID()
+    {
+        using var lConnection = new SqliteConnection(_targetUserAndChannelConnectionString);
+        lConnection.Open();
+
+        string lSql = @"
+            SELECT ChannelID 
+            FROM TargetUserAndChannel";
+            
+        using var lCmd = new SqliteCommand(lSql, lConnection);
+        
+        var result = lCmd.ExecuteScalar();
+        return result?.ToString();
+    }
+    public string? GetTargetUserID()
+    {
+        using var lConnection = new SqliteConnection(_targetUserAndChannelConnectionString);
+        lConnection.Open();
+
+        string lSql = @"
+            SELECT UserID 
+            FROM TargetUserAndChannel";
+            
+        using var lCmd = new SqliteCommand(lSql, lConnection);
+        
+        var result = lCmd.ExecuteScalar();
+        return result?.ToString();
+    }
+    public void CheckIfTargetUserAndChannelSet(SqliteConnection aConnection)
+    {
+        string lTableCmd = @"
+            CREATE TABLE IF NOT EXISTS TargetUserAndChannel (
+                ID INTEGER PRIMARY KEY Check (ID = 1),
+                UserID TEXT NOT NULL,
+                ChannelID TEXT NOT NULL
+            )";
+        using var createCmd = new SqliteCommand(lTableCmd, aConnection);
+        createCmd.ExecuteNonQuery();
     }
 }

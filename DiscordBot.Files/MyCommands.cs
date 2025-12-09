@@ -1,3 +1,4 @@
+using System.Reflection;
 using DSharpPlus;
 using DSharpPlus.Entities;
 using DSharpPlus.SlashCommands;
@@ -114,6 +115,31 @@ public class MyCommands : ApplicationCommandModule
         var channel = await ctx.Client.GetChannelAsync(ulong.Parse(lChannelID));
 
         await ctx.CreateResponseAsync($"Current TLDR channel is {channel?.Name}.");
+    }
+    [SlashCommand("SetTarget", "Set target user and target channel for responses. Requires admin permissions.")]
+    public async Task SetTargetCommand(InteractionContext ctx, 
+                            [Option("user", "User to set")] DiscordUser aUser, 
+                            [Option("channel", "Channel to set")] DiscordChannel aChannel)
+    {        
+        if (!ctx.Member.Permissions.HasPermission(Permissions.Administrator))
+        {
+            await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
+                new DiscordInteractionResponseBuilder().WithContent("You must be an admin to use this command."));         
+            return;
+        }
+        try
+        {
+            var lDB = ctx.Services.GetRequiredService<DatabaseHelper>();
+            lDB.SetTargetUserAndChannel(aUser.Id.ToString(), aChannel.Id.ToString());
+    
+            await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
+                new DiscordInteractionResponseBuilder().WithContent($"Set target to {aUser.Username} in {aChannel.Name}.")); 
+        }
+        catch (Exception ex)
+        {
+            await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
+                new DiscordInteractionResponseBuilder().WithContent($"[SetTarget Error] {ex.GetType().Name}: {ex.Message}"));
+        }       
     }
     [SlashCommand("otd", "Get today's On This Day message")]
     public async Task OTDCommand(InteractionContext ctx)

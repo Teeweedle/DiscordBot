@@ -27,7 +27,7 @@ public class CohereClient
                 Model = "command-a-03-2025",   
                 Message = aPrompt,
                 MaxTokens = 300,
-                Temperature = 0.3
+                Temperature = 0.7
             };
 
             HttpResponseMessage lResponse = await _http.PostAsJsonAsync("chat", request);

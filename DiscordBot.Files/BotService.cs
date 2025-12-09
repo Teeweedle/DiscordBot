@@ -3,6 +3,7 @@ using DSharpPlus.Entities;
 using DSharpPlus.SlashCommands;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Configuration;
+using System.Threading.Tasks;
 
 public class BotService
 {
@@ -13,6 +14,10 @@ public class BotService
     private readonly ulong BotTestChannelID = 1445164447093227633;
     private readonly ulong BotID = 1428047784245854310;
     private static readonly HttpClient _httpClient = new HttpClient();
+    private readonly Dictionary<ulong, DateTime> _lastChannelSrape = new();
+    private readonly Dictionary<ulong, DateTime> _lastBotRespond = new();
+    private static readonly int ScrapeDelay = 5;
+    private static readonly int RespondDelay = 2;
 
     public BotService(string aToken)
     {
@@ -43,8 +48,13 @@ public class BotService
     {
         _discord.MessageCreated += async (s, e) =>
        {
-           if (!e.Author.IsBot)
+            if (!e.Author.IsBot)
                SaveMessage(e.Message);
+            if(string.Equals(e.Author.Id.ToString(), _dbh.GetTargetUserID(), StringComparison.Ordinal) &&
+                string.Equals(e.Channel.Id.ToString(), _dbh.GetTargetChannelID(), StringComparison.Ordinal))
+            {
+                await RespondToUser(e.Message, e.Channel, e.Author);
+            }                
        };
     }
     public async Task<DiscordWebhook> EnsureAvailableWebhookAsync(ulong aChannelID)
@@ -89,7 +99,7 @@ public class BotService
             try
             {
                 Console.WriteLine("Bot is connected and ready.");
-                Console.WriteLine($"Guild Count: {_discord.Guilds.Count}");
+                // Console.WriteLine($"Guild Count: {_discord.Guilds.Count}");
                 await ScrapeAllGuilds(_discord);
             }
             catch (Exception ex)
@@ -136,12 +146,63 @@ public class BotService
     
                 await Task.Delay(500);
             }
+            
+            _lastChannelSrape[aChannel.Id] = DateTime.UtcNow;
         }
         catch (DSharpPlus.Exceptions.UnauthorizedException)
         {
             Console.WriteLine($"No access to #{aChannel.Name}");
         }
     }
+    private async Task ScrapeLoopAsync(DiscordChannel aChannel)
+    {
+        while (true)
+        {
+            if (CanScrape(aChannel))
+            {
+                await ScrapeChannelAsync(aChannel);
+            }
+            await Task.Delay(TimeSpan.FromMinutes(5));
+        }
+    }
+    private bool CanScrape(DiscordChannel aChannel)
+    {
+        if(!_lastChannelSrape.TryGetValue(aChannel.Id, out var last))
+            return true;
+        return DateTime.UtcNow - last >= TimeSpan.FromHours(ScrapeDelay);
+    }
+    private bool CanRespond(DiscordUser aUser, DiscordMessage aMessage)
+    {
+        if(_lastBotRespond.TryGetValue(aUser.Id, out var last) &&
+            DateTime.UtcNow - last < TimeSpan.FromMinutes(RespondDelay))
+        {
+            Console.WriteLine("Respond Delay");
+            return false;
+        }
+            
+        //No empty messages
+        if (string.IsNullOrWhiteSpace(aMessage.Content))
+        {
+            Console.WriteLine("Empty message");
+            return false;
+        }
+            
+        //No URLs
+        if(Uri.IsWellFormedUriString(aMessage.Content.Trim(), UriKind.Absolute))
+        {
+            Console.WriteLine("No URL");
+            return false;
+        }
+            
+        //No http links
+        if(aMessage.Content.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+        {
+            Console.WriteLine("No http link");
+            return false;
+        }
+            
+        return true;
+    } 
     private async Task ScrapeAllGuilds(DiscordClient aDiscord)
     {
         foreach (var guild in aDiscord.Guilds.Values)
@@ -153,7 +214,7 @@ public class BotService
                 if (channel.Type == ChannelType.Text)
                 {
                     Console.WriteLine($"Scraping #{channel.Name} in {guild.Name}...");
-                    await ScrapeChannelAsync(channel);
+                    _ = ScrapeLoopAsync(channel);
                 }
             }
         }
@@ -358,6 +419,23 @@ public class BotService
         var lTLDRFormat = TLDRFormatter(lResponse);
         await SendMessage(null, lChannelID, lTLDRFormat);
     }
+    private async Task RespondToUser(DiscordMessage aMessage, DiscordChannel aChannel, DiscordUser aUser)
+    {
+        if(!CanRespond(aUser, aMessage))
+            return;
+        Console.WriteLine("Responding...");
+        DiscordGuild lGuild = await _discord.GetGuildAsync(aChannel.GuildId.Value);
+        CohereClient lCohere = new CohereClient(_cohereKey);
+
+        string lPrompt = $"Respond to the following message as if you are another user in Discord but do it " 
+            + $"in in a sultry yet playful manner. The reponse doesn't have to be long or overly detailed "
+            + $"but it should be interesting and slightly suggestive: {aMessage.Content}";
+        string lResponse = await lCohere.AskAsync(lPrompt);
+        var lSultryFormat = await SultryResponse(lResponse, aUser, lGuild);
+        _lastBotRespond[aUser.Id] = DateTime.UtcNow;
+
+        await SendMessage(null, aChannel.Id, lSultryFormat);
+    }
     public static (string, string, string?) MotDFormatter(DiscordMessage aMsg, MessageRecord aBestMsg)
     {
         string lUserName = $"\nOn this day in {aBestMsg.Timestamp.Year}";
@@ -374,6 +452,16 @@ public class BotService
         string lUserName = $"\nToday's TLDR:";
         string lContent = $"------------------------------------------------\n" 
                 + $"{aMsg}";
+        string lFooter = string.Empty;
+
+        return (lUserName, lContent, lFooter);
+    }
+    public static async Task<(string, string, string?)> SultryResponse(string aMsg, DiscordUser aUser, DiscordGuild aGuild)
+    {   
+        DiscordMember lMember = await aGuild.GetMemberAsync(aUser.Id);
+        string lUserNickName = lMember.Nickname ?? aUser.Username;
+        string lUserName = $"\n{lUserNickName}'s Sex Kitten:";
+        string lContent = $"{aMsg}";
         string lFooter = string.Empty;
 
         return (lUserName, lContent, lFooter);
