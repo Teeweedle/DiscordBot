@@ -15,6 +15,12 @@ public class CohereClient
         _http.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
     }
 
+        /// <summary>
+        /// Asks Cohere AI to generate a response based on the given prompt.
+        /// </summary>
+        /// <param name="aPrompt">The prompt to be sent to Cohere AI.</param>
+        /// <returns>The response from Cohere AI, or an empty string if the request failed.</returns>
+        /// <exception cref="ArgumentException">If the prompt is null or empty.</exception>
     public async Task<string> AskAsync(string aPrompt)
     {
         if (string.IsNullOrEmpty(aPrompt))
