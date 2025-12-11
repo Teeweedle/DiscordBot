@@ -1,18 +1,18 @@
-using System.Reflection;
 using DSharpPlus;
 using DSharpPlus.Entities;
 using DSharpPlus.SlashCommands;
+using DSharpPlus.SlashCommands.Attributes;
 using Microsoft.Extensions.DependencyInjection;
 
 public class MyCommands : ApplicationCommandModule
 {   
-    /// <summary>
-    /// Set MotD channel for this guild. Saves it to database located in data folder ChannelInfo.db
-    /// </summary>
-    /// <param name="ctx"></param>
-    /// <param name="aChannel"></param>
-    /// <returns></returns>
+    private readonly Messaging _messaging;
+    public MyCommands(Messaging aMessaging)
+    {
+        _messaging = aMessaging;
+    } 
     [SlashCommand("SetMotDChannel", "Set MotD channel for this guild. Requires admin permissions.")]
+    [SlashCommandPermissions(Permissions.Administrator)]
     public async Task SetMOTDChannelCommand(InteractionContext ctx, [Option("channel", "Channel to set")] DiscordChannel aChannel)
     {
         var lDB = ctx.Services.GetRequiredService<DatabaseHelper>();
@@ -26,14 +26,9 @@ public class MyCommands : ApplicationCommandModule
         lDB.SetMotDChannel(ctx.Guild.Id.ToString(), aChannel.Id.ToString());
 
         await ctx.CreateResponseAsync($"Set MotD channel to {aChannel.Name}");
-    }
-    /// <summary>
-    /// Set weighted channel for MotD functionality. Messages count for more weight in this channel. Saves it to database located in data folder ChannelInfo.db
-    /// </summary>
-    /// <param name="ctx"></param>
-    /// <param name="channel"></param>
-    /// <returns></returns>
+    } 
     [SlashCommand("SetMotDWeightedChannel", "Set weighted channel for MotD functionality. Requires admin permissions.")]
+    [SlashCommandPermissions(Permissions.Administrator)]
     public async Task SetMOTDWeightedChannelCommand(InteractionContext ctx, [Option("channel", "Channel to set")] DiscordChannel channel)
     {
         var ldb = ctx.Services.GetRequiredService<DatabaseHelper>();
@@ -48,12 +43,8 @@ public class MyCommands : ApplicationCommandModule
 
         await ctx.CreateResponseAsync($"Set weighted channel to {channel.Name}");
     }
-    /// <summary>
-    /// Get current weighted channel
-    /// </summary>
-    /// <param name="ctx"></param>
-    /// <returns></returns>
     [SlashCommand("GetCurrentWeightedChannel", "Get current MotD weighted channel.")]
+    [SlashCommandPermissions(Permissions.Administrator)]
     public async Task GetCurrentWeightedChannelCommand(InteractionContext ctx)
     {
         var ldb = ctx.Services.GetRequiredService<DatabaseHelper>();
@@ -73,6 +64,7 @@ public class MyCommands : ApplicationCommandModule
         await ctx.CreateResponseAsync($"Current weighted channel is {channel?.Name}.");
     }
     [SlashCommand("SetTLDRChannel", "Set TLDR channel for this guild. Requires admin permissions.")]
+    [SlashCommandPermissions(Permissions.Administrator)]
     public async Task SetTLDRChannelCommand(InteractionContext ctx, [Option("channel", "Channel to set")] DiscordChannel aChannel)
     {
         try
@@ -94,7 +86,26 @@ public class MyCommands : ApplicationCommandModule
             Console.WriteLine($"[SetTLDRChannel Error] {ex.GetType().Name}: {ex.Message}");            
         }
     }
+    [SlashCommand("TLDR", "Get TLDR for this channel.")]
+    [SlashRequirePermissions(Permissions.SendMessages)]
+    public async Task TLDRCommand(InteractionContext ctx)
+    {
+        await ctx.CreateResponseAsync(
+            InteractionResponseType.DeferredChannelMessageWithSource,
+            new DiscordInteractionResponseBuilder().AsEphemeral(true)
+        );
+
+        string lSummary = await _messaging.PostChannelSummaryAsync(ctx.Channel);
+
+        await ctx.EditResponseAsync(new DiscordWebhookBuilder()
+            .AddEmbed(new DiscordEmbedBuilder()
+                .WithTitle($"TLDR for #{ctx.Channel.Name}")
+                .WithDescription(lSummary)
+                .WithColor(DiscordColor.Yellow))
+            );
+    }
     [SlashCommand("GetTLDRChannel", "Get TLDR channel for this guild. Requires admin permissions.")]
+    [SlashCommandPermissions(Permissions.Administrator)]
     public async Task GetTLDRChannelCommand(InteractionContext ctx)
     {
         var lDB = ctx.Services.GetRequiredService<DatabaseHelper>();
@@ -115,8 +126,9 @@ public class MyCommands : ApplicationCommandModule
         var channel = await ctx.Client.GetChannelAsync(ulong.Parse(lChannelID));
 
         await ctx.CreateResponseAsync($"Current TLDR channel is {channel?.Name}.");
-    }
+    }    
     [SlashCommand("SetTarget", "Set target user and target channel for responses. Requires admin permissions.")]
+    [SlashCommandPermissions(Permissions.Administrator)]
     public async Task SetTargetCommand(InteractionContext ctx, 
                             [Option("user", "User to set")] DiscordUser aUser, 
                             [Option("channel", "Channel to set")] DiscordChannel aChannel)
@@ -141,11 +153,31 @@ public class MyCommands : ApplicationCommandModule
                 new DiscordInteractionResponseBuilder().WithContent($"[SetTarget Error] {ex.GetType().Name}: {ex.Message}"));
         }       
     }
-    [SlashCommand("otd", "Get today's On This Day message")]
+    [SlashCommand("PostMotD", "Get today's MotD")]
+    [SlashCommandPermissions(Permissions.Administrator)]
     public async Task OTDCommand(InteractionContext ctx)
     {
         //TODO: Get a rng message for this day some time ago...
         //Send ctx to PostMotD so it knows what channel if no channel is set
-
+        if(!ctx.Member.Permissions.HasPermission(Permissions.Administrator))
+        {
+            await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
+                new DiscordInteractionResponseBuilder().WithContent("You must be an admin to use this command."));
+            return;
+        }
+        DiscordChannel lInvokingChannel = ctx.Channel;
+        try
+        {
+            await _messaging.PostMotDAsync(lInvokingChannel.Id);
+            await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
+                new DiscordInteractionResponseBuilder()
+                    .WithContent("Posted MotD.")
+                    .AsEphemeral(true));
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[MotD Error] {ex.GetType().Name}: {ex.Message}");            
+            throw;
+        }
     }   
 }

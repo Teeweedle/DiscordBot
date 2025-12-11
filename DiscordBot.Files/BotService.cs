@@ -39,6 +39,7 @@ public class BotService
     {
         var lServices = new ServiceCollection()
             .AddSingleton<DatabaseHelper>(_dbh)
+            .AddSingleton<Messaging>(_messaging)
             .BuildServiceProvider();
 
         var slash = _discord.UseSlashCommands(new SlashCommandsConfiguration
@@ -70,7 +71,6 @@ public class BotService
             try
             {
                 Console.WriteLine("Bot is connected and ready.");
-                // Console.WriteLine($"Guild Count: {_discord.Guilds.Count}");
                 await ScrapeAllGuilds(_discord);
             }
             catch (Exception ex)

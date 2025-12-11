@@ -23,12 +23,12 @@ public class Messaging
     /// </remarks>
     private bool CanRespond(DiscordUser aUser, DiscordMessage aMessage)
     {
-        if(_lastBotRespond.TryGetValue(aUser.Id, out var last) &&
-            DateTime.UtcNow - last < TimeSpan.FromMinutes(RespondDelay))
-        {
-            Console.WriteLine("Respond Delay");
-            return false;
-        }
+        // if(_lastBotRespond.TryGetValue(aUser.Id, out var last) &&
+        //     DateTime.UtcNow - last < TimeSpan.FromMinutes(RespondDelay))
+        // {
+        //     Console.WriteLine("Respond Delay");
+        //     return false;
+        // }
             
         //No empty messages
         if (string.IsNullOrWhiteSpace(aMessage.Content))
@@ -74,50 +74,63 @@ public class Messaging
         await _messagingService.SendWebhookMessageAsync(null, aChannel.Id, lSultryFormat);
     }
     /// <summary>
+    /// Posts the most interesting message of the day to the testing channel. For testing purposes only
+    /// If <paramref name="testMode"/> is true, the message will be posted to the <see cref="BotTestChannelID"/> channel.
+    /// </summary>
+    /// <param name="testMode">If true, the message will be posted to the <see cref="BotTestChannelID"/> channel.</param>
+    public async Task PostMotDAsync(bool testMode)
+    {
+        Console.WriteLine($"(Test Mode: {testMode})");
+
+        if (!testMode)
+            throw new Exception("PostMotDAsync(bool) must be called with testMode set to true.");
+
+        await PostMotDAsync(BotTestChannelID);
+    }
+    /// <summary>
     /// Posts the most interesting message of the day to the specified channel.
     /// If testMode is true, the message will be posted to the <see cref="BotTestChannelID"/> channel.
     /// </summary>
     /// <param name="testMode">If true, the message will be posted to the <see cref="BotTestChannelID"/> channel.</param>
-    public async Task PostMotDAsync(bool testMode = false)
+    public async Task PostMotDAsync(ulong aChannelID)
     {
-        Console.WriteLine($"Posting MOTD... (Test Mode: {testMode})");
+        Console.WriteLine($"Posting MOTD... ");
         var MOTDService = new OnThisDayService();
-        ulong lChannelID;
 
         List<MessageRecord> lMessages = _messagingService.GetTodaysMsgs();
         List<MessageRecord> lMergedMessages = MergeMultiPartMessages(lMessages);
-        if (testMode)
+        ulong lTargetChannelID;
+        if (aChannelID == BotTestChannelID)
         {
-            lChannelID = BotTestChannelID;
-        }
-        else
-        {
-            string? lmotdID = _messagingService.GetMoTDChannelID()!;
-            if(string.IsNullOrEmpty(lmotdID)) //LEFT OFF HERE, handle if no channel
-            {            
-                await _messagingService.SendChannelMessageAsync("No MoTD channel set.", BotTestChannelID);
+            lTargetChannelID = aChannelID;
+        }else{
+            string? lMotdID = _messagingService.GetMoTDChannelID()!;
+            if (string.IsNullOrEmpty(lMotdID))
+            {
+                await _messagingService.SendChannelMessageAsync("No MoTD channel set.", aChannelID);
                 return;
             }
-            lChannelID = ulong.Parse(lmotdID);   
-        }
+            lTargetChannelID = ulong.Parse(lMotdID); 
+        } 
         
         if (lMergedMessages.Count == 0)
         {
-            await _messagingService.SendChannelMessageAsync("Today is a slow day in history. No messages were found for today.", lChannelID);
+            await _messagingService.SendChannelMessageAsync("Today is a slow day in history. No messages were found for today.", 
+                        lTargetChannelID);
             return;
         }
         string? lWeightedChannelID = _messagingService.GetWeightedChannelID();
         var lBestMsg = MOTDService.GetMotD(lMergedMessages, lWeightedChannelID ?? string.Empty);
         if(lBestMsg == null)
         {
-            await _messagingService.SendChannelMessageAsync("No message found for today.", lChannelID);
+            await _messagingService.SendChannelMessageAsync("No message found for today.", lTargetChannelID);
             return;
         }
         DiscordChannel lSourceChannel = await _messagingService.GetSourceChannel(ulong.Parse(lBestMsg.ChannelID));
         var lOriginalMsg = await lSourceChannel.GetMessageAsync(ulong.Parse(lBestMsg.MessageID));
         var lMotDFormat = MotDFormatter(lOriginalMsg, lBestMsg);
 
-        await _messagingService.SendWebhookMessageAsync(lOriginalMsg, lChannelID, lMotDFormat);                         
+        await _messagingService.SendWebhookMessageAsync(lOriginalMsg, lTargetChannelID, lMotDFormat);                         
     }
     /// <summary>
     /// Groups messages from the same user within 7 minutes
@@ -192,6 +205,26 @@ public class Messaging
         }        
         return lNewMessage;
     }
+    public async Task<string> PostChannelSummaryAsync(DiscordChannel aChannel)
+    {
+        List<MessageRecord> lMessages =  _messagingService.GetLast24HoursMsgs();
+
+        CohereClient lCohere = _messagingService.GetCohereClient();
+
+        StringBuilder lSB = new StringBuilder();
+        foreach (var m in lMessages)
+        {
+            lSB.Append(' ').Append(m.Content.Replace("\n", " "));
+        }
+        
+        string lPrompt = $"Summarize the following text. Format the summary with bullets or list items so it is easy to read "
+            + $"and don't include a title, just the summary: {lSB.ToString()}";
+        string lResponse = await lCohere.AskAsync(lPrompt);
+
+     
+        String lTLDRFormat = TLDRFormatter(lResponse, aChannel.Name);
+        return lResponse;
+    }
     /// <summary>
     /// Posts a summary of the last 24 hours of messages in the #general channel to the #general channel.
     /// </summary>
@@ -242,9 +275,18 @@ public class Messaging
 
         return (lUserName, lContent, lFooter);
     }
+    public static string TLDRFormatter(string aMsg, string aChannelName)
+    {
+        string lUserName = $"Today's TLDR for {aChannelName}:\n";
+        string lContent = $"------------------------------------------------\n" 
+                + $"{aMsg}";
+        string lFooter = string.Empty;
+
+        return lUserName + lContent + lFooter;
+    }
     public static (string, string, string?) TLDRFormatter(string aMsg)
     {
-        string lUserName = $"\nToday's TLDR:";
+        string lUserName = $"Today's TLDR for:\n";
         string lContent = $"------------------------------------------------\n" 
                 + $"{aMsg}";
         string lFooter = string.Empty;
