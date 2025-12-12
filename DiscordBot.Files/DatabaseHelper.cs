@@ -220,44 +220,44 @@ public class DatabaseHelper
         lCmd.Parameters.AddWithValue("$WeightedChannelID", aChannelID);
         lCmd.ExecuteNonQuery();
     }
-    /// <summary>
-    /// Sets TLDR channel for this guild. Saves it to database located in data folder ChannelInfo.db. 
-    /// AI will post a summary of messages from General in this channel
-    /// <param name="aGuildID"></param>
-    /// <param name="aChannelID">Channel to post TLDR</param>
-    public void SetTLDRChannel(string aGuildID, string aChannelID)
-    {
-        using var lConnection = new SqliteConnection(_channelInfoConnectionString);
-        lConnection.Open();
+    // /// <summary>
+    // /// Sets TLDR channel for this guild. Saves it to database located in data folder ChannelInfo.db. 
+    // /// AI will post a summary of messages from General in this channel
+    // /// <param name="aGuildID"></param>
+    // /// <param name="aChannelID">Channel to post TLDR</param>
+    // public void SetTLDRChannel(string aGuildID, string aChannelID)
+    // {
+    //     using var lConnection = new SqliteConnection(_channelInfoConnectionString);
+    //     lConnection.Open();
 
-        CheckChannelTableExists(lConnection);
+    //     CheckChannelTableExists(lConnection);
 
-        string lInsertCmd = @"
-            INSERT INTO ChannelInfo (GuildID, TLDRChannelID) 
-            VALUES ($GuildID, $TLDRChannelID) 
-            ON CONFLICT (GuildID) DO UPDATE SET TLDRChannelID = $TLDRChannelID";
+    //     string lInsertCmd = @"
+    //         INSERT INTO ChannelInfo (GuildID, TLDRChannelID) 
+    //         VALUES ($GuildID, $TLDRChannelID) 
+    //         ON CONFLICT (GuildID) DO UPDATE SET TLDRChannelID = $TLDRChannelID";
 
-        using var lCmd = new SqliteCommand(lInsertCmd, lConnection);
+    //     using var lCmd = new SqliteCommand(lInsertCmd, lConnection);
 
-        lCmd.Parameters.AddWithValue("$GuildID", aGuildID);
-        lCmd.Parameters.AddWithValue("$TLDRChannelID", aChannelID);
-        lCmd.ExecuteNonQuery();
-    }
-    public string? GetTLDRChannelID()
-    {
-        using var lConnection = new SqliteConnection(_channelInfoConnectionString);
-        lConnection.Open();
+    //     lCmd.Parameters.AddWithValue("$GuildID", aGuildID);
+    //     lCmd.Parameters.AddWithValue("$TLDRChannelID", aChannelID);
+    //     lCmd.ExecuteNonQuery();
+    // }
+    // public string? GetTLDRChannelID()
+    // {
+    //     using var lConnection = new SqliteConnection(_channelInfoConnectionString);
+    //     lConnection.Open();
 
-        string lSql = @"
-            SELECT TLDRChannelID 
-            FROM ChannelInfo 
-            LIMIT 1";
+    //     string lSql = @"
+    //         SELECT TLDRChannelID 
+    //         FROM ChannelInfo 
+    //         LIMIT 1";
             
-        using var lCmd = new SqliteCommand(lSql, lConnection);
+    //     using var lCmd = new SqliteCommand(lSql, lConnection);
         
-        var result = lCmd.ExecuteScalar();
-        return result?.ToString();        
-    }
+    //     var result = lCmd.ExecuteScalar();
+    //     return result?.ToString();        
+    // }
     /// <summary>
     /// Returns weighted channel ID from ChannelInfo.db
     /// </summary>

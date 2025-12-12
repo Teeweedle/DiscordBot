@@ -19,12 +19,12 @@
             await bot.PostMotDAsync(testMode);
             return;
         }
-        if(args.Length > 0 && args[0].Equals("posttldr", StringComparison.OrdinalIgnoreCase))
-        {
-            bool testMode = args.Length > 1 && args[1].Equals("test", StringComparison.OrdinalIgnoreCase);
-            await bot.PostChannelSummaryAsync(testMode);
-            return;
-        }
+        // if(args.Length > 0 && args[0].Equals("posttldr", StringComparison.OrdinalIgnoreCase))
+        // {
+        //     bool testMode = args.Length > 1 && args[1].Equals("test", StringComparison.OrdinalIgnoreCase);
+        //     await bot.PostChannelSummaryAsync(testMode);
+        //     return;
+        // }
 
         await bot.RunAsync();
     }    

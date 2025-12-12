@@ -112,6 +112,6 @@ public class MessagingService
     public async Task<DiscordChannel> GetSourceChannel(ulong aChannelID) => await _discord.GetChannelAsync(aChannelID)!;
     public CohereClient GetCohereClient() => _cohereClient;
     public async Task<DiscordGuild> GetDiscordGuild(ulong aGuildID) => await _discord.GetGuildAsync(aGuildID);
-    public string GetTLDRChannelID() => _dbh.GetTLDRChannelID()!;
+    // public string GetTLDRChannelID() => _dbh.GetTLDRChannelID()!;
     
 }

@@ -220,50 +220,48 @@ public class Messaging
         string lPrompt = $"Summarize the following text. Format the summary with bullets or list items so it is easy to read "
             + $"and don't include a title, just the summary: {lSB.ToString()}";
         string lResponse = await lCohere.AskAsync(lPrompt);
-
      
-        String lTLDRFormat = TLDRFormatter(lResponse, aChannel.Name);
         return lResponse;
     }
-    /// <summary>
-    /// Posts a summary of the last 24 hours of messages in the #general channel to the #general channel.
-    /// </summary>
-    /// <param name="testMode">If true, the summary will be posted to the <see cref="BotTestChannelID"/> channel.</param>
-    /// <remarks>This function is intended to be called once daily to keep the #general channel up to date.</remarks>
-    public async Task PostChannelSummaryAsync(bool testMode = false)
-    {
-        Console.WriteLine($"Posting channel summary... (Test Mode: {testMode})");
-        List<MessageRecord> lMessages =  _messagingService.GetLast24HoursMsgs();
+    // /// <summary>
+    // /// Posts a summary of the last 24 hours of messages in the #general channel to the #general channel.
+    // /// </summary>
+    // /// <param name="testMode">If true, the summary will be posted to the <see cref="BotTestChannelID"/> channel.</param>
+    // /// <remarks>This function is intended to be called once daily to keep the #general channel up to date.</remarks>
+    // public async Task PostChannelSummaryAsync(bool testMode = false)
+    // {
+    //     Console.WriteLine($"Posting channel summary... (Test Mode: {testMode})");
+    //     List<MessageRecord> lMessages =  _messagingService.GetLast24HoursMsgs();
 
-        CohereClient lCohere = _messagingService.GetCohereClient();
-        ulong lChannelID;
+    //     CohereClient lCohere = _messagingService.GetCohereClient();
+    //     ulong lChannelID;
 
-        StringBuilder lSB = new StringBuilder();
-        foreach (var m in lMessages)
-        {
-            lSB.Append(' ').Append(m.Content.Replace("\n", " "));
-        }
+    //     StringBuilder lSB = new StringBuilder();
+    //     foreach (var m in lMessages)
+    //     {
+    //         lSB.Append(' ').Append(m.Content.Replace("\n", " "));
+    //     }
         
-        string lPrompt = $"Summarize the following text: {lSB.ToString()}";
-        string lResponse = await lCohere.AskAsync(lPrompt);
+    //     string lPrompt = $"Summarize the following text: {lSB.ToString()}";
+    //     string lResponse = await lCohere.AskAsync(lPrompt);
 
-        if (testMode)
-        {
-            lChannelID = BotTestChannelID;
-        }
-        else
-        {
-            string? lTLDRChannelID = _messagingService.GetTLDRChannelID()!;
-            lChannelID = ulong.Parse(lTLDRChannelID);
-        }
-        if(string.IsNullOrEmpty(lResponse))
-        {
-            await _messagingService.SendChannelMessageAsync("No response from Cohere.", lChannelID);
-            return;
-        }
-        var lTLDRFormat = TLDRFormatter(lResponse);
-        await _messagingService.SendWebhookMessageAsync(null, lChannelID, lTLDRFormat);
-    }
+    //     if (testMode)
+    //     {
+    //         lChannelID = BotTestChannelID;
+    //     }
+    //     else
+    //     {
+    //         string? lTLDRChannelID = _messagingService.GetTLDRChannelID()!;
+    //         lChannelID = ulong.Parse(lTLDRChannelID);
+    //     }
+    //     if(string.IsNullOrEmpty(lResponse))
+    //     {
+    //         await _messagingService.SendChannelMessageAsync("No response from Cohere.", lChannelID);
+    //         return;
+    //     }
+    //     var lTLDRFormat = TLDRFormatter(lResponse);
+    //     await _messagingService.SendWebhookMessageAsync(null, lChannelID, lTLDRFormat);
+    // }
     public static (string, string, string?) MotDFormatter(DiscordMessage aMsg, MessageRecord aBestMsg)
     {
         string lUserName = $"\nOn this day in {aBestMsg.Timestamp.Year}";
@@ -284,15 +282,15 @@ public class Messaging
 
         return lUserName + lContent + lFooter;
     }
-    public static (string, string, string?) TLDRFormatter(string aMsg)
-    {
-        string lUserName = $"Today's TLDR for:\n";
-        string lContent = $"------------------------------------------------\n" 
-                + $"{aMsg}";
-        string lFooter = string.Empty;
+    // public static (string, string, string?) TLDRFormatter(string aMsg)
+    // {
+    //     string lUserName = $"Today's TLDR for:\n";
+    //     string lContent = $"------------------------------------------------\n" 
+    //             + $"{aMsg}";
+    //     string lFooter = string.Empty;
 
-        return (lUserName, lContent, lFooter);
-    }
+    //     return (lUserName, lContent, lFooter);
+    // }
     public static async Task<(string, string, string?)> SultryResponse(string aMsg, DiscordUser aUser, DiscordGuild aGuild)
     {   
         DiscordMember lMember = await aGuild.GetMemberAsync(aUser.Id);

@@ -63,29 +63,29 @@ public class MyCommands : ApplicationCommandModule
 
         await ctx.CreateResponseAsync($"Current weighted channel is {channel?.Name}.");
     }
-    [SlashCommand("SetTLDRChannel", "Set TLDR channel for this guild. Requires admin permissions.")]
-    [SlashCommandPermissions(Permissions.Administrator)]
-    public async Task SetTLDRChannelCommand(InteractionContext ctx, [Option("channel", "Channel to set")] DiscordChannel aChannel)
-    {
-        try
-        {
-            var lDB = ctx.Services.GetRequiredService<DatabaseHelper>();
+    // [SlashCommand("SetTLDRChannel", "Set TLDR channel for this guild. Requires admin permissions.")]
+    // [SlashCommandPermissions(Permissions.Administrator)]
+    // public async Task SetTLDRChannelCommand(InteractionContext ctx, [Option("channel", "Channel to set")] DiscordChannel aChannel)
+    // {
+    //     try
+    //     {
+    //         var lDB = ctx.Services.GetRequiredService<DatabaseHelper>();
     
-            if (!ctx.Member.Permissions.HasPermission(Permissions.Administrator))
-            {
-                await ctx.CreateResponseAsync("You must be an admin to use this command.");
-                return;
-            }
+    //         if (!ctx.Member.Permissions.HasPermission(Permissions.Administrator))
+    //         {
+    //             await ctx.CreateResponseAsync("You must be an admin to use this command.");
+    //             return;
+    //         }
     
-            lDB.SetTLDRChannel(ctx.Guild.Id.ToString(), aChannel.Id.ToString());
+    //         lDB.SetTLDRChannel(ctx.Guild.Id.ToString(), aChannel.Id.ToString());
     
-            await ctx.CreateResponseAsync($"Set TLDR channel to {aChannel.Name}");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[SetTLDRChannel Error] {ex.GetType().Name}: {ex.Message}");            
-        }
-    }
+    //         await ctx.CreateResponseAsync($"Set TLDR channel to {aChannel.Name}");
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         Console.WriteLine($"[SetTLDRChannel Error] {ex.GetType().Name}: {ex.Message}");            
+    //     }
+    // }
     [SlashCommand("TLDR", "Get TLDR for this channel.")]
     [SlashRequirePermissions(Permissions.SendMessages)]
     public async Task TLDRCommand(InteractionContext ctx)
@@ -104,29 +104,29 @@ public class MyCommands : ApplicationCommandModule
                 .WithColor(DiscordColor.Yellow))
             );
     }
-    [SlashCommand("GetTLDRChannel", "Get TLDR channel for this guild. Requires admin permissions.")]
-    [SlashCommandPermissions(Permissions.Administrator)]
-    public async Task GetTLDRChannelCommand(InteractionContext ctx)
-    {
-        var lDB = ctx.Services.GetRequiredService<DatabaseHelper>();
+    // [SlashCommand("GetTLDRChannel", "Get TLDR channel for this guild. Requires admin permissions.")]
+    // [SlashCommandPermissions(Permissions.Administrator)]
+    // public async Task GetTLDRChannelCommand(InteractionContext ctx)
+    // {
+    //     var lDB = ctx.Services.GetRequiredService<DatabaseHelper>();
 
-        if (!ctx.Member.Permissions.HasPermission(Permissions.Administrator))
-        {
-            await ctx.CreateResponseAsync("You must be an admin to use this command.");
-            return;
-        }
+    //     if (!ctx.Member.Permissions.HasPermission(Permissions.Administrator))
+    //     {
+    //         await ctx.CreateResponseAsync("You must be an admin to use this command.");
+    //         return;
+    //     }
 
-        string? lChannelID = lDB.GetTLDRChannelID();
-        if (string.IsNullOrEmpty(lChannelID))
-        {
-            await ctx.CreateResponseAsync("No TLDR channel set.");
-            return;
-        }
+    //     string? lChannelID = lDB.GetTLDRChannelID();
+    //     if (string.IsNullOrEmpty(lChannelID))
+    //     {
+    //         await ctx.CreateResponseAsync("No TLDR channel set.");
+    //         return;
+    //     }
 
-        var channel = await ctx.Client.GetChannelAsync(ulong.Parse(lChannelID));
+    //     var channel = await ctx.Client.GetChannelAsync(ulong.Parse(lChannelID));
 
-        await ctx.CreateResponseAsync($"Current TLDR channel is {channel?.Name}.");
-    }    
+    //     await ctx.CreateResponseAsync($"Current TLDR channel is {channel?.Name}.");
+    // }    
     [SlashCommand("SetTarget", "Set target user and target channel for responses. Requires admin permissions.")]
     [SlashCommandPermissions(Permissions.Administrator)]
     public async Task SetTargetCommand(InteractionContext ctx, 

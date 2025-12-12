@@ -3,6 +3,7 @@ using DSharpPlus.Entities;
 using DSharpPlus.SlashCommands;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Configuration;
+using DSharpPlus.EventArgs;
 
 public class BotService
 {
@@ -16,6 +17,7 @@ public class BotService
     private readonly HttpClient _httpClient;
     private readonly Dictionary<ulong, DateTime> _lastChannelSrape = new();
     private static readonly int ScrapeDelay = 5;
+    private static ulong _guildID = 429063504725671947;
 
     public BotService(string aToken)
     {        
@@ -46,7 +48,17 @@ public class BotService
         {
             Services = lServices
         });
-        slash.RegisterCommands<MyCommands>();
+        slash.RegisterCommands<MyCommands>(_guildID);
+    }
+    public async Task DeleteCommands()
+    {
+        var cmds = await _discord.GetGuildApplicationCommandsAsync(_guildID);
+        foreach (var cmd in cmds)
+        {
+            Console.WriteLine($"Deleting command: {cmd.Name} ({cmd.Id})");
+            await _discord.DeleteGuildApplicationCommandAsync(_guildID, cmd.Id);
+        }
+        Console.WriteLine("All guild commands deleted. Restarting clean…");
     }
     public void RegisterEventHandler()
     {
@@ -62,29 +74,30 @@ public class BotService
        };
     }
     public async Task RunAsync()
-    {
-        RegisterCommands();
-        RegisterEventHandler();
+    {              
         Console.WriteLine($"Today is: {DateOnly.FromDateTime(DateTime.Now)}");
-        _discord.GuildDownloadCompleted += async (s, e) =>
-        {
-            try
+        _discord.GuildDownloadCompleted += OnGuildDownloadCompleted; 
+        
+        RegisterEventHandler();
+
+        await _discord.ConnectAsync(); 
+        // await DeleteCommands();  //for testing
+        // Keep the program running
+        await Task.Delay(-1);
+    }
+    private async Task OnGuildDownloadCompleted(DiscordClient sender, GuildDownloadCompletedEventArgs e)
+    {
+        try
             {
                 Console.WriteLine("Bot is connected and ready.");
+                RegisterCommands();
                 await ScrapeAllGuilds(_discord);
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"[Scrape Error] {ex.GetType().Name}: {ex.Message}");
                 throw;
-            }
-        };
-
-        // Connect to Discord
-        await _discord.ConnectAsync();
-
-        // Keep the program running
-        await Task.Delay(-1);
+            }        
     }
     // /// <summary>
     // /// Calls DatabaseHelper.SaveMessage
@@ -159,5 +172,5 @@ public class BotService
         return DateTime.UtcNow - last >= TimeSpan.FromHours(ScrapeDelay);
     }
     public Task PostMotDAsync(bool testMode) => _messaging.PostMotDAsync(testMode);
-    public Task PostChannelSummaryAsync(bool testMode) => _messaging.PostChannelSummaryAsync(testMode);    
+    // public Task PostChannelSummaryAsync(bool testMode) => _messaging.PostChannelSummaryAsync(testMode);    
 }
