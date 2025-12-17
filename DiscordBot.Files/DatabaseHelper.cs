@@ -1,3 +1,5 @@
+using System.ComponentModel.Design;
+using System.Globalization;
 using DSharpPlus.Entities;
 using Microsoft.Data.Sqlite;
 public class DatabaseHelper
@@ -7,10 +9,13 @@ public class DatabaseHelper
     private static readonly string _channelInfoDBPath = Path.Combine(_folderPath, "ChannelInfo.db");
     private static readonly string _webhookInfoDBPath = Path.Combine(_folderPath, "WebhookInfo.db");
     private static readonly string _targetUserAndChannelDBPath = Path.Combine(_folderPath, "TargetUserAndChannel.db");
+    private static readonly string _remindMeDBPath = Path.Combine(_folderPath, "RemindMe.db");
     private readonly string _messagesConnectionString = $"Data Source={_messagesDBPath}";
     private string _channelInfoConnectionString = $"Data Source={_channelInfoDBPath}";
     private string _webhookInfoConnectionString = $"Data Source={_webhookInfoDBPath}";
     private string _targetUserAndChannelConnectionString = $"Data Source={_targetUserAndChannelDBPath}";
+    private string _remindMeConnectionString = $"Data Source={_remindMeDBPath}";
+    private const string _dateTimeFormat = "yyyy-MM-dd HH:mm:ss";
 
     public DatabaseHelper(string? aConnectionString = null)
     {
@@ -168,7 +173,7 @@ public class DatabaseHelper
                 AttachmentCount = lReader.GetInt32(lReader.GetOrdinal("AttachmentCount")),
                 ReactionCount = lReader.GetInt32(lReader.GetOrdinal("ReactionCount")),
                 Timestamp = DateTime.Parse(lReader.GetString(lReader.GetOrdinal("Timestamp")), 
-                                                null, System.Globalization.DateTimeStyles.AssumeLocal)
+                                                null, DateTimeStyles.AssumeLocal)
             };
             lMessageList.Add(lMessage);
         }
@@ -220,44 +225,6 @@ public class DatabaseHelper
         lCmd.Parameters.AddWithValue("$WeightedChannelID", aChannelID);
         lCmd.ExecuteNonQuery();
     }
-    // /// <summary>
-    // /// Sets TLDR channel for this guild. Saves it to database located in data folder ChannelInfo.db. 
-    // /// AI will post a summary of messages from General in this channel
-    // /// <param name="aGuildID"></param>
-    // /// <param name="aChannelID">Channel to post TLDR</param>
-    // public void SetTLDRChannel(string aGuildID, string aChannelID)
-    // {
-    //     using var lConnection = new SqliteConnection(_channelInfoConnectionString);
-    //     lConnection.Open();
-
-    //     CheckChannelTableExists(lConnection);
-
-    //     string lInsertCmd = @"
-    //         INSERT INTO ChannelInfo (GuildID, TLDRChannelID) 
-    //         VALUES ($GuildID, $TLDRChannelID) 
-    //         ON CONFLICT (GuildID) DO UPDATE SET TLDRChannelID = $TLDRChannelID";
-
-    //     using var lCmd = new SqliteCommand(lInsertCmd, lConnection);
-
-    //     lCmd.Parameters.AddWithValue("$GuildID", aGuildID);
-    //     lCmd.Parameters.AddWithValue("$TLDRChannelID", aChannelID);
-    //     lCmd.ExecuteNonQuery();
-    // }
-    // public string? GetTLDRChannelID()
-    // {
-    //     using var lConnection = new SqliteConnection(_channelInfoConnectionString);
-    //     lConnection.Open();
-
-    //     string lSql = @"
-    //         SELECT TLDRChannelID 
-    //         FROM ChannelInfo 
-    //         LIMIT 1";
-            
-    //     using var lCmd = new SqliteCommand(lSql, lConnection);
-        
-    //     var result = lCmd.ExecuteScalar();
-    //     return result?.ToString();        
-    // }
     /// <summary>
     /// Returns weighted channel ID from ChannelInfo.db
     /// </summary>
@@ -448,5 +415,90 @@ public class DatabaseHelper
             )";
         using var createCmd = new SqliteCommand(lTableCmd, aConnection);
         createCmd.ExecuteNonQuery();
+    }
+    public void SaveRemindMe(ReminderRecord aReminder)
+    {
+        using var lConnection = new SqliteConnection(_remindMeConnectionString);
+        lConnection.Open();
+
+        CheckIfRemindMeTableExists(lConnection);
+
+        string lInsertCmd = @"
+            INSERT INTO RemindMeMessage (InteractionID, UserID, ExpirationDate, Message) 
+            VALUES ($InteractionID, $UserID, $ExpirationDate, $Message)";
+
+        using var lCmd = new SqliteCommand(lInsertCmd, lConnection);
+
+        lCmd.Parameters.AddWithValue("$InteractionID", (long)aReminder.InteractionID);
+        lCmd.Parameters.AddWithValue("$UserID", (long)aReminder.UserID);
+        lCmd.Parameters.AddWithValue("$ExpirationDate", aReminder.ExpirationDate.ToString("yyyy-MM-dd HH:mm:ss"));
+        lCmd.Parameters.AddWithValue("$Message", aReminder.Message);
+        lCmd.ExecuteNonQuery();
+    }
+    public void RemoveRemindMe(ulong aInteractionID)
+    {
+        using var lConnection = new SqliteConnection(_remindMeConnectionString);
+        lConnection.Open();
+
+        string lSql = @"
+            DELETE FROM RemindMeMessage
+            WHERE InteractionID = $InteractionID";
+            
+        using var lCmd = new SqliteCommand(lSql, lConnection);
+        lCmd.Parameters.AddWithValue("$InteractionID", (long)aInteractionID);
+        lCmd.ExecuteNonQuery();
+    }
+    public List<ReminderRecord> CheckRemindMeForTracking()
+    {
+        using var lConnection = new SqliteConnection(_remindMeConnectionString);
+        
+        lConnection.Open();
+
+        string lTableCmd = @"
+            SELECT InteractionID, UserID, ExpirationDate, Message 
+            FROM RemindMeMessage
+            WHERE ExpirationDate <= datetime('now', '+24 hours')";
+            
+        using var lCmd = new SqliteCommand(lTableCmd, lConnection);
+        using var lReader = lCmd.ExecuteReader();
+
+        var lInteractionIDOrdinal = lReader.GetOrdinal("InteractionID");
+        var lUserIDOrdinal = lReader.GetOrdinal("UserID");
+        var lExpirationDateOrdinal = lReader.GetOrdinal("ExpirationDate");
+        var lMessageOrdinal = lReader.GetOrdinal("Message");
+
+        List<ReminderRecord> lReminders = new List<ReminderRecord>();
+        while (lReader.Read())
+        {
+            var lReminder = new ReminderRecord
+            {
+                InteractionID = (ulong)lReader.GetInt64(lInteractionIDOrdinal),
+                UserID = (ulong)lReader.GetInt64(lUserIDOrdinal),
+                ExpirationDate = ParseDateTime(lReader.GetString(lExpirationDateOrdinal)),
+                Message = lReader.GetString(lMessageOrdinal)
+            };
+            lReminders.Add(lReminder);
+        }
+        return lReminders;
+    }
+    public void CheckIfRemindMeTableExists(SqliteConnection aConnection)
+    {
+        string lTableCmd = @"
+            CREATE TABLE IF NOT EXISTS RemindMeMessage (
+                InteractionID INTEGER PRIMARY KEY,
+                UserID INTEGER NOT NULL,
+                ExpirationDate TEXT NOT NULL,
+                Message TEXT NOT NULL
+            )";
+        using var createCmd = new SqliteCommand(lTableCmd, aConnection);
+        createCmd.ExecuteNonQuery();
+    }
+    public DateTime ParseDateTime(string aDateTimeString)
+    {        
+        return DateTime.ParseExact(
+                aDateTimeString, 
+                _dateTimeFormat, 
+                CultureInfo.InvariantCulture, 
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal);
     }
 }

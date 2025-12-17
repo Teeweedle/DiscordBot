@@ -7,9 +7,11 @@ using Microsoft.Extensions.DependencyInjection;
 public class MyCommands : ApplicationCommandModule
 {   
     private readonly Messaging _messaging;
-    public MyCommands(Messaging aMessaging)
+    private readonly ReminderService _reminderService;
+    public MyCommands(Messaging aMessaging, ReminderService aReminderService)
     {
         _messaging = aMessaging;
+        _reminderService = aReminderService;
     } 
     [SlashCommand("SetMotDChannel", "Set MotD channel for this guild. Requires admin permissions.")]
     [SlashCommandPermissions(Permissions.Administrator)]
@@ -62,30 +64,7 @@ public class MyCommands : ApplicationCommandModule
         var channel = await ctx.Client.GetChannelAsync(ulong.Parse(lChannelID));
 
         await ctx.CreateResponseAsync($"Current weighted channel is {channel?.Name}.");
-    }
-    // [SlashCommand("SetTLDRChannel", "Set TLDR channel for this guild. Requires admin permissions.")]
-    // [SlashCommandPermissions(Permissions.Administrator)]
-    // public async Task SetTLDRChannelCommand(InteractionContext ctx, [Option("channel", "Channel to set")] DiscordChannel aChannel)
-    // {
-    //     try
-    //     {
-    //         var lDB = ctx.Services.GetRequiredService<DatabaseHelper>();
-    
-    //         if (!ctx.Member.Permissions.HasPermission(Permissions.Administrator))
-    //         {
-    //             await ctx.CreateResponseAsync("You must be an admin to use this command.");
-    //             return;
-    //         }
-    
-    //         lDB.SetTLDRChannel(ctx.Guild.Id.ToString(), aChannel.Id.ToString());
-    
-    //         await ctx.CreateResponseAsync($"Set TLDR channel to {aChannel.Name}");
-    //     }
-    //     catch (Exception ex)
-    //     {
-    //         Console.WriteLine($"[SetTLDRChannel Error] {ex.GetType().Name}: {ex.Message}");            
-    //     }
-    // }
+    }   
     [SlashCommand("TLDR", "Get TLDR for this channel.")]
     [SlashRequirePermissions(Permissions.SendMessages)]
     public async Task TLDRCommand(InteractionContext ctx)
@@ -95,7 +74,7 @@ public class MyCommands : ApplicationCommandModule
             new DiscordInteractionResponseBuilder().AsEphemeral(true)
         );
 
-        string lSummary = await _messaging.PostChannelSummaryAsync(ctx.Channel);
+        string lSummary = await _messaging.GetChannelSummaryAsync(ctx.Channel);
 
         await ctx.EditResponseAsync(new DiscordWebhookBuilder()
             .AddEmbed(new DiscordEmbedBuilder()
@@ -104,29 +83,7 @@ public class MyCommands : ApplicationCommandModule
                 .WithColor(DiscordColor.Yellow))
             );
     }
-    // [SlashCommand("GetTLDRChannel", "Get TLDR channel for this guild. Requires admin permissions.")]
-    // [SlashCommandPermissions(Permissions.Administrator)]
-    // public async Task GetTLDRChannelCommand(InteractionContext ctx)
-    // {
-    //     var lDB = ctx.Services.GetRequiredService<DatabaseHelper>();
-
-    //     if (!ctx.Member.Permissions.HasPermission(Permissions.Administrator))
-    //     {
-    //         await ctx.CreateResponseAsync("You must be an admin to use this command.");
-    //         return;
-    //     }
-
-    //     string? lChannelID = lDB.GetTLDRChannelID();
-    //     if (string.IsNullOrEmpty(lChannelID))
-    //     {
-    //         await ctx.CreateResponseAsync("No TLDR channel set.");
-    //         return;
-    //     }
-
-    //     var channel = await ctx.Client.GetChannelAsync(ulong.Parse(lChannelID));
-
-    //     await ctx.CreateResponseAsync($"Current TLDR channel is {channel?.Name}.");
-    // }    
+      
     [SlashCommand("SetTarget", "Set target user and target channel for responses. Requires admin permissions.")]
     [SlashCommandPermissions(Permissions.Administrator)]
     public async Task SetTargetCommand(InteractionContext ctx, 
@@ -157,27 +114,52 @@ public class MyCommands : ApplicationCommandModule
     [SlashCommandPermissions(Permissions.Administrator)]
     public async Task OTDCommand(InteractionContext ctx)
     {
-        //TODO: Get a rng message for this day some time ago...
-        //Send ctx to PostMotD so it knows what channel if no channel is set
         if(!ctx.Member.Permissions.HasPermission(Permissions.Administrator))
         {
             await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
                 new DiscordInteractionResponseBuilder().WithContent("You must be an admin to use this command."));
             return;
         }
-        DiscordChannel lInvokingChannel = ctx.Channel;
+        await ctx.CreateResponseAsync(InteractionResponseType.DeferredChannelMessageWithSource,
+            new DiscordInteractionResponseBuilder().AsEphemeral(true));
         try
         {
-            await _messaging.PostMotDAsync(lInvokingChannel.Id);
-            await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
-                new DiscordInteractionResponseBuilder()
-                    .WithContent("Posted MotD.")
-                    .AsEphemeral(true));
+            // var lStopWatch = Stopwatch.StartNew();
+            await _messaging.PostMotDAsync(ctx.Channel.Id);
+            // lStopWatch.Stop();
+            // await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent($"Done in {lStopWatch.Elapsed}"));
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[MotD Error] {ex.GetType().Name}: {ex.Message}");            
+            await ctx.EditResponseAsync(new DiscordWebhookBuilder()
+                .WithContent($"[PostMotD Error] {ex.GetType().Name}: {ex.Message}"));
+            throw;
+        }        
+    }
+    [SlashCommand("RemindMe", "Remind me when...")]
+    [SlashCommandPermissions(Permissions.SendMessages)]
+    public async Task RemindMeCommand(InteractionContext ctx, 
+                            [Option("amount", "Numerical Value")] long aAmount, 
+                            [Option("unit", "Unit of time")]
+                                [Choice("seconds", "s")] 
+                                [Choice("minutes", "m")] 
+                                [Choice("hours", "h")] 
+                                [Choice("days", "d")] 
+                                [Choice("months", "mo")] 
+                                [Choice("years", "y")] string aUnit,
+                            [Option("message", "Reminder message")] string aMessage)
+    {
+        await ctx.CreateResponseAsync(InteractionResponseType.DeferredChannelMessageWithSource,
+            new DiscordInteractionResponseBuilder().AsEphemeral(true));
+        try
+        {
+            await _reminderService.CreateReminder(ctx.Member.Id, aAmount, aUnit, aMessage, ctx.Interaction.Id);
+        }
+        catch (Exception ex)
+        {
+            await ctx.EditResponseAsync(new DiscordWebhookBuilder()
+                .WithContent($"[RemindMe Error] {ex.GetType().Name}: {ex.Message}"));
             throw;
         }
-    }   
+    }
 }
