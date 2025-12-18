@@ -448,11 +448,12 @@ public class DatabaseHelper
         lCmd.Parameters.AddWithValue("$InteractionID", (long)aInteractionID);
         lCmd.ExecuteNonQuery();
     }
-    public List<ReminderRecord> CheckRemindMeForTracking()
+    public List<ReminderRecord> GetExpiringReminders()
     {
-        using var lConnection = new SqliteConnection(_remindMeConnectionString);
-        
+        using var lConnection = new SqliteConnection(_remindMeConnectionString);        
         lConnection.Open();
+
+        CheckIfRemindMeTableExists(lConnection);
 
         string lTableCmd = @"
             SELECT InteractionID, UserID, ExpirationDate, Message 

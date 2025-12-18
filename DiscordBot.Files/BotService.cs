@@ -11,13 +11,12 @@ public class BotService
     private readonly DiscordClient _discord;
     private readonly DatabaseHelper _dbh;
     private readonly MessagingService _messagingService;
-    private readonly ReminderService _reminderService;
+    private readonly IReminderService _reminderService;
     private readonly Messaging _messaging;
     private readonly CohereClient _cohereClient;
     private readonly string _cohereKey;
     private readonly HttpClient _httpClient;
     private readonly Dictionary<ulong, DateTime> _lastChannelSrape = new();
-    private List<ReminderRecord> _reminders = new();
     private static readonly int ScrapeDelay = 5;
     private static ulong _guildID = 429063504725671947;
 
@@ -39,7 +38,7 @@ public class BotService
         _messagingService = new MessagingService(_discord, _httpClient, _dbh, _cohereClient);
         _messaging = new Messaging(_messagingService);
         _reminderService = new ReminderService(_dbh);
-        _reminderService.ReminderNeedsTracking += OnReminderNeedsTracking;
+        // _reminderService.ReminderNeedsTracking += OnReminderNeedsTracking;
     }
     public void RegisterCommands()
     {
@@ -47,7 +46,7 @@ public class BotService
         var lServices = new ServiceCollection()
             .AddSingleton<DatabaseHelper>(_dbh)
             .AddSingleton<Messaging>(_messaging)
-            .AddSingleton<ReminderService>(_reminderService)
+            .AddSingleton<IReminderService>(_reminderService)
             .BuildServiceProvider();
 
         var slash = _discord.UseSlashCommands(new SlashCommandsConfiguration
@@ -87,7 +86,7 @@ public class BotService
         RegisterEventHandler();
 
         await _discord.ConnectAsync();
-        _reminders = await _reminderService.LoadReminderList();
+        await _reminderService.LoadExpiringReminderList();
         _discord.GuildDownloadCompleted += OnGuildDownloadCompleted; 
         // await DeleteCommands();  //for testing
         // Keep the program running
@@ -178,17 +177,6 @@ public class BotService
         if(!_lastChannelSrape.TryGetValue(aChannel.Id, out var last))
             return true;
         return DateTime.UtcNow - last >= TimeSpan.FromHours(ScrapeDelay);
-    }
-    public void OnReminderNeedsTracking(ReminderRecord aReminder)
-    {
-        _reminders.Add(aReminder);
-        //sort list by earliest date first
-        _reminders.Sort((a, b) => a.ExpirationDate.CompareTo(b.ExpirationDate));
-    }
-    public void RemoveRemindMe(ReminderRecord aReminder)
-    {
-        _reminders.RemoveAll(reminder => reminder.ExpirationDate < DateTime.Now);
-        _dbh.RemoveRemindMe(aReminder.InteractionID);
     }
     public Task PostMotDAsync(bool testMode) => _messaging.PostMotDAsync(testMode);
 }

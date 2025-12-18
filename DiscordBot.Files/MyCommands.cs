@@ -127,7 +127,7 @@ public class MyCommands : ApplicationCommandModule
             // var lStopWatch = Stopwatch.StartNew();
             await _messaging.PostMotDAsync(ctx.Channel.Id);
             // lStopWatch.Stop();
-            // await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent($"Done in {lStopWatch.Elapsed}"));
+            await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent($"Done."));
         }
         catch (Exception ex)
         {
