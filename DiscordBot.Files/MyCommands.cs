@@ -7,8 +7,8 @@ using Microsoft.Extensions.DependencyInjection;
 public class MyCommands : ApplicationCommandModule
 {   
     private readonly Messaging _messaging;
-    private readonly ReminderService _reminderService;
-    public MyCommands(Messaging aMessaging, ReminderService aReminderService)
+    private readonly IReminderService _reminderService;
+    public MyCommands(Messaging aMessaging, IReminderService aReminderService)
     {
         _messaging = aMessaging;
         _reminderService = aReminderService;

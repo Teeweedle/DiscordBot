@@ -1,15 +1,28 @@
 using System.Text;
+using DSharpPlus;
 using DSharpPlus.Entities;
 
 public class Messaging
 {
     private static readonly int RespondDelay = 2;
     private readonly Dictionary<ulong, DateTime> _lastBotRespond = new();
-    private readonly MessagingService _messagingService;
+    private readonly DatabaseHelper _dbh;
+    private readonly DiscordClient _discord;
+    private readonly CohereClient _cohereClient;
+    private readonly HttpClient _httpClient;
+    // private readonly MessagingService _messagingService;
+    private readonly ulong BotID = 1428047784245854310;
+
     private readonly ulong BotTestChannelID = 1445164447093227633;
-    public Messaging(MessagingService aMessagingService)
+    public Messaging(DatabaseHelper aDb, 
+                    DiscordClient aDiscord, 
+                    CohereClient aCohereClient, 
+                    HttpClient aHttpClient)
     {
-        _messagingService = aMessagingService;
+        _dbh = aDb;
+        _discord = aDiscord;
+        _cohereClient = aCohereClient;
+        _httpClient = aHttpClient;
     }    
     /// <summary>
     /// Checks if a bot can respond to a user in a message.
@@ -22,14 +35,7 @@ public class Messaging
     /// if the message is empty, if the message contains a URL, or if the message starts with "http://".
     /// </remarks>
     private bool CanRespond(DiscordUser aUser, DiscordMessage aMessage)
-    {
-        // if(_lastBotRespond.TryGetValue(aUser.Id, out var last) &&
-        //     DateTime.UtcNow - last < TimeSpan.FromMinutes(RespondDelay))
-        // {
-        //     Console.WriteLine("Respond Delay");
-        //     return false;
-        // }
-            
+    {            
         //No empty messages
         if (string.IsNullOrWhiteSpace(aMessage.Content))
         {
@@ -61,17 +67,16 @@ public class Messaging
         if(!aChannel.GuildId.HasValue) 
             return;
         Console.WriteLine("Responding...");
-        DiscordGuild lGuild = await _messagingService.GetDiscordGuild(aChannel.GuildId.Value);
-        CohereClient lCohere = _messagingService.GetCohereClient();
+        DiscordGuild lGuild = await _discord.GetGuildAsync(aChannel.GuildId.Value);
 
         string lPrompt = $"Respond to the following message as if you are another user in Discord but do it " 
             + $"in a playful manner. The reponse should be funny, helpful, and informative "
             + $"(maybe a little sarcastic and flirty): {aMessage.Content}";
-        string lResponse = await lCohere.AskAsync(lPrompt);
+        string lResponse = await _cohereClient.AskAsync(lPrompt);
         var lSultryFormat = await SultryResponse(lResponse, aUser, lGuild);
         _lastBotRespond[aUser.Id] = DateTime.UtcNow;
 
-        await _messagingService.SendWebhookMessageAsync(null, aChannel.Id, lSultryFormat);
+        await SendWebhookMessageAsync(null, aChannel.Id, lSultryFormat);
     }
     /// <summary>
     /// Posts the most interesting message of the day to the testing channel. For testing purposes only
@@ -97,17 +102,17 @@ public class Messaging
         Console.WriteLine($"Posting MOTD... ");
         var MOTDService = new OnThisDayService();
 
-        List<MessageRecord> lMessages = _messagingService.GetTodaysMsgs();
+        List<MessageRecord> lMessages = _dbh.GetTodaysMsgs(DateTime.UtcNow.Date);
         List<MessageRecord> lMergedMessages = MergeMultiPartMessages(lMessages);
         ulong lTargetChannelID;
         if (aChannelID == BotTestChannelID)
         {
             lTargetChannelID = aChannelID;
         }else{
-            string? lMotdID = _messagingService.GetMoTDChannelID()!;
+            string? lMotdID = _dbh.GetMoTDChannelID()!;
             if (string.IsNullOrEmpty(lMotdID))
             {
-                await _messagingService.SendChannelMessageAsync("No MoTD channel set.", aChannelID);
+                await SendChannelMessageAsync("No MoTD channel set.", aChannelID);
                 return;
             }
             lTargetChannelID = ulong.Parse(lMotdID); 
@@ -115,22 +120,22 @@ public class Messaging
         
         if (lMergedMessages.Count == 0)
         {
-            await _messagingService.SendChannelMessageAsync("Today is a slow day in history. No messages were found for today.", 
+            await SendChannelMessageAsync("Today is a slow day in history. No messages were found for today.", 
                         lTargetChannelID);
             return;
         }
-        string? lWeightedChannelID = _messagingService.GetWeightedChannelID();
+        string? lWeightedChannelID = _dbh.GetWeightedChannelID();
         var lBestMsg = MOTDService.GetMotD(lMergedMessages, lWeightedChannelID ?? string.Empty);
         if(lBestMsg == null)
         {
-            await _messagingService.SendChannelMessageAsync("No message found for today.", lTargetChannelID);
+            await SendChannelMessageAsync("No message found for today.", lTargetChannelID);
             return;
         }
-        DiscordChannel lSourceChannel = await _messagingService.GetSourceChannel(ulong.Parse(lBestMsg.ChannelID));
+        DiscordChannel lSourceChannel = await _discord.GetChannelAsync(ulong.Parse(lBestMsg.ChannelID));
         var lOriginalMsg = await lSourceChannel.GetMessageAsync(ulong.Parse(lBestMsg.MessageID));
         var lMotDFormat = MotDFormatter(lOriginalMsg, lBestMsg);
 
-        await _messagingService.SendWebhookMessageAsync(lOriginalMsg, lTargetChannelID, lMotDFormat);                         
+        await SendWebhookMessageAsync(lOriginalMsg, lTargetChannelID, lMotDFormat);                         
     }
     /// <summary>
     /// Groups messages from the same user within 7 minutes
@@ -207,9 +212,7 @@ public class Messaging
     }
     public async Task<string> GetChannelSummaryAsync(DiscordChannel aChannel)
     {
-        List<MessageRecord> lMessages =  _messagingService.GetLast24HoursMsgs();
-
-        CohereClient lCohere = _messagingService.GetCohereClient();
+        List<MessageRecord> lMessages =  _dbh.GetLast24HoursMsgs(DateTime.Now, aChannel.Id.ToString());
 
         StringBuilder lSB = new StringBuilder();
         foreach (var m in lMessages)
@@ -219,10 +222,11 @@ public class Messaging
         
         string lPrompt = $"Summarize the following text. Format the summary with bullets or list items so it is easy to read "
             + $"and don't include a title, just the summary: {lSB.ToString()}";
-        string lResponse = await lCohere.AskAsync(lPrompt);
+        string lResponse = await _cohereClient.AskAsync(lPrompt);
      
         return lResponse;
-    }  
+    }
+   
     public static (string, string, string?) MotDFormatter(DiscordMessage aMsg, MessageRecord aBestMsg)
     {
         string lUserName = $"\nOn this day in {aBestMsg.Timestamp.Year}";
@@ -243,5 +247,83 @@ public class Messaging
         string lFooter = string.Empty;
 
         return (lUserName, lContent, lFooter);
+    }
+    public async Task<DiscordWebhook> EnsureAvailableWebhookAsync(ulong aChannelID)
+    {
+        DiscordChannel lChannel = await _discord.GetChannelAsync(aChannelID);
+
+        string? lWebHookID = _dbh.GetWebHookID(lChannel.GuildId!.Value.ToString(), aChannelID.ToString());
+        string? lWebHookToken = _dbh.GetWebHookToken(lChannel.GuildId!.Value.ToString(), aChannelID.ToString());
+
+        if (!string.IsNullOrEmpty(lWebHookID) && !string.IsNullOrEmpty(lWebHookToken))
+        {
+            return await _discord.GetWebhookWithTokenAsync(ulong.Parse(lWebHookID!), lWebHookToken!);
+        }
+
+        var lExistingWebhooks = await lChannel.GetWebhooksAsync();
+        var lWebHook = lExistingWebhooks.FirstOrDefault(x => x.Name == "OnThisDayWebhook");
+        
+        if (lWebHook == null)
+        {
+            lWebHook = await lChannel.CreateWebhookAsync("OnThisDayWebhook");
+
+            if (lWebHook == null)
+            {
+                throw new Exception("Failed to create webhook., bot does not have permissions.");
+            }
+        }
+        
+        _dbh.SaveWebHook(
+            lChannel.GuildId!.Value.ToString(), 
+            aChannelID.ToString(), 
+            lWebHook.Id.ToString(), 
+            lWebHook.Token!);
+        return await _discord.GetWebhookWithTokenAsync(lWebHook.Id, lWebHook.Token!);
+    }
+    /// <summary>
+    /// Formats and sends a message using a webhook
+    /// </summary>
+    /// <param name="aMessage">The Original message</param>
+    /// <param name="aBestMsg">Best message with grouped content</param>
+    /// <param name="aChannelID"></param>
+    /// <returns></returns>
+    public async Task SendWebhookMessageAsync(DiscordMessage? aMessage, 
+                        ulong aChannelID,
+                        (string userName, string content, string? footer) aFormat)    {
+
+        var lWebHook = await EnsureAvailableWebhookAsync(aChannelID);  
+        var lBot = await _discord.GetUserAsync(BotID);
+        
+        var lWebHookBuilder = new DiscordWebhookBuilder()
+            .WithUsername(aFormat.userName)
+            .WithContent(aFormat.content)
+            .WithAvatarUrl(lBot.AvatarUrl);
+
+        if(aMessage != null)
+        {
+           foreach (var attachment in aMessage.Attachments)
+            {
+                var lStream = await _httpClient.GetStreamAsync(attachment.Url);
+                lWebHookBuilder.AddFile(attachment.FileName, lStream);
+            } 
+        }    
+        
+        await lWebHook.ExecuteAsync(lWebHookBuilder);
+
+        if (!string.IsNullOrEmpty(aFormat.footer))
+        {
+            var lFooterBuilder = new DiscordWebhookBuilder()
+                .WithUsername(aFormat.userName)
+                .WithContent(aFormat.footer)
+                .WithAvatarUrl(lBot.AvatarUrl);
+            await lWebHook.ExecuteAsync(lFooterBuilder);
+        }
+    }
+        public async Task SendChannelMessageAsync(string aMessage, ulong aChannelID)
+    {
+        var lmsgBuilder = new DiscordMessageBuilder();
+        lmsgBuilder.WithContent(aMessage);
+        var lChannel = await _discord.GetChannelAsync(aChannelID);
+        await lChannel.SendMessageAsync(lmsgBuilder);
     }
 }

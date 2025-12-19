@@ -9,10 +9,19 @@ public class ReminderChecker : BackgroundService
     }
     protected override async Task ExecuteAsync(CancellationToken aStoppingToken)
     {
+        //load the days reminders
+        _reminderService.LoadExpiringReminderList();
+
         while(!aStoppingToken.IsCancellationRequested)
         {
-            await _reminderService.LoadExpiringReminderList();
-            await Task.Delay(-1);
+            var lInterval = _reminderService.GetNextReminderInterval();
+            if (lInterval == TimeSpan.Zero)
+            {
+                await Task.Delay(TimeSpan.FromMinutes(10), aStoppingToken);
+                continue;
+            }
+            await Task.Delay(lInterval, aStoppingToken);
+            await _reminderService.CheckForExpiredReminders(); 
         }
     }
 }

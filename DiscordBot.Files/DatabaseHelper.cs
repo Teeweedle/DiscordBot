@@ -1,4 +1,3 @@
-using System.ComponentModel.Design;
 using System.Globalization;
 using DSharpPlus.Entities;
 using Microsoft.Data.Sqlite;
@@ -448,6 +447,10 @@ public class DatabaseHelper
         lCmd.Parameters.AddWithValue("$InteractionID", (long)aInteractionID);
         lCmd.ExecuteNonQuery();
     }
+    /// <summary>
+    /// Retrieves a list of reminders that are due to expire within the next 24 hours.
+    /// </summary>
+    /// <returns>A list of <see cref="ReminderRecord"/> containing reminders that are due to expire within the next 24 hours.</returns>
     public List<ReminderRecord> GetExpiringReminders()
     {
         using var lConnection = new SqliteConnection(_remindMeConnectionString);        

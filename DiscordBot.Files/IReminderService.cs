@@ -1,6 +1,7 @@
 public interface IReminderService
 {
-    Task LoadExpiringReminderList();
-    void RemoveReminder(ReminderRecord aReminder);
-    void TrackExpiringReminder(ReminderRecord aReminder);    
+    void LoadExpiringReminderList();
+    Task CreateReminder(ulong aUserID, long aAmount, string aDuration, string aMessage, ulong aInteractionID);
+    TimeSpan GetNextReminderInterval();
+    Task CheckForExpiredReminders();
 }

@@ -1,14 +1,14 @@
-using DSharpPlus.Entities;
-using NUnit.Framework.Constraints;
+using System.Threading.Tasks;
 
 public class ReminderService : IReminderService
 {
-    DatabaseHelper _db;
-    // public event Action<ReminderRecord>? ReminderNeedsTracking;
+    private DatabaseHelper _db;
+    private readonly IReminderNotifier _reminderNotifier;
     private List<ReminderRecord> _reminders = new List<ReminderRecord>();
-    public ReminderService(DatabaseHelper aDb)
+    public ReminderService(DatabaseHelper aDb, IReminderNotifier aReminderNotifier)
     {
         _db = aDb;
+        _reminderNotifier = aReminderNotifier;
     }
     public async Task CreateReminder(ulong aUserID, long aAmount, string aDuration, string aMessage, ulong aInteractionID)
     {
@@ -22,16 +22,15 @@ public class ReminderService : IReminderService
             InteractionID = aInteractionID
         };
         _db.SaveRemindMe(lReminder);
-        if(ShouldTrackReminder(lReminder.ExpirationDate.ToString()))
+        if(ShouldTrackReminder(lReminder.ExpirationDate))
         {
             TrackExpiringReminder(lReminder);
-            // ReminderNeedsTracking?.Invoke(lReminder);
         }
         await Task.Delay(lDuration);
     }
-    private bool ShouldTrackReminder(string aExpirationDate)
+    private bool ShouldTrackReminder(DateTime aExpirationDate)
     {
-        return DateTime.Parse(aExpirationDate) - DateTime.Now < TimeSpan.FromHours(24);
+        return aExpirationDate - DateTime.Now < TimeSpan.FromHours(24);
     }
     private TimeSpan ParseDuration (string aDuration, long aAmount)
     {
@@ -46,43 +45,41 @@ public class ReminderService : IReminderService
             _ => TimeSpan.Zero
         };
     }
-    public async Task LoadExpiringReminderList()
+    public void LoadExpiringReminderList()
     {
         _reminders = _db.GetExpiringReminders();
-        if (_reminders.Count > 0)
-        {
-            var lInterval = GetNextReminderInterval();
-            //start background service ReminderChecker and pass the first interval
-        }
     }
-    private TimeSpan GetNextReminderInterval()
-    {
+    public TimeSpan GetNextReminderInterval()
+    {    
+        if (_reminders.Count == 0) return TimeSpan.Zero;
+
         return (_reminders[0].ExpirationDate - DateTime.Now).Add(TimeSpan.FromSeconds(1));
     }
-    public void CheckForExpiredReminders()
+    public async Task CheckForExpiredReminders()
     {
-        
-    }
-    public void SendReminder()
-    {
-        //send message reminder
         List<ReminderRecord> lExpiredReminders = _reminders
                                             .Where(reminder => reminder.ExpirationDate < DateTime.Now)
                                             .ToList();
         foreach (var lReminder in lExpiredReminders)
         {
-            //send message
-            //remove from list
-            //remove from database
+            await SendReminder(lReminder);
+            DeleteReminder(lReminder);
         }
-
     }
-    public void RemoveReminder(ReminderRecord aReminder)
+    private async Task SendReminder(ReminderRecord aReminder)
     {
-        _reminders.RemoveAll(reminder => reminder.ExpirationDate < DateTime.Now);
+        await _reminderNotifier.SendReminderAsync(aReminder);
+    }
+    /// <summary>
+    /// Removes the reminder from the list of tracked reminders and from the database
+    /// </summary>
+    /// <param name="aReminder">The reminder to remove</param>
+    private void DeleteReminder(ReminderRecord aReminder)
+    {
+        _reminders.Remove(aReminder);//Check if right
         _db.RemoveRemindMe(aReminder.InteractionID);
     } 
-    public void TrackExpiringReminder(ReminderRecord aReminder)
+    private void TrackExpiringReminder(ReminderRecord aReminder)
     {
         _reminders.Add(aReminder);
         //sort list by earliest date first
