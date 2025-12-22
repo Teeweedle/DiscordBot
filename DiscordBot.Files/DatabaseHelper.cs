@@ -3,7 +3,8 @@ using DSharpPlus.Entities;
 using Microsoft.Data.Sqlite;
 public class DatabaseHelper
 {
-    private static readonly string _folderPath = Path.Combine(AppContext.BaseDirectory, "data");
+    private static readonly string _folderPath = Path.GetFullPath(
+                                                    Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "data"));
     private static readonly string _messagesDBPath = Path.Combine(_folderPath, "Messages.db");
     private static readonly string _channelInfoDBPath = Path.Combine(_folderPath, "ChannelInfo.db");
     private static readonly string _webhookInfoDBPath = Path.Combine(_folderPath, "WebhookInfo.db");
@@ -72,6 +73,7 @@ public class DatabaseHelper
     public List<MessageRecord> GetTodaysMsgs(DateTime aCurrentDate)
     {
         using var lConnection = new SqliteConnection(_messagesConnectionString);
+        Console.WriteLine($"Connection string: {_messagesConnectionString}");
         lConnection.Open();
 
         List<int> lYearsWithMessages = GetYearsWithMessages(lConnection, aCurrentDate);
@@ -423,13 +425,14 @@ public class DatabaseHelper
         CheckIfRemindMeTableExists(lConnection);
 
         string lInsertCmd = @"
-            INSERT INTO RemindMeMessage (InteractionID, UserID, ExpirationDate, Message) 
-            VALUES ($InteractionID, $UserID, $ExpirationDate, $Message)";
+            INSERT INTO RemindMeMessage (InteractionID, UserID, GuildID, ExpirationDate, Message) 
+            VALUES ($InteractionID, $UserID, $GuildID, $ExpirationDate, $Message)";
 
         using var lCmd = new SqliteCommand(lInsertCmd, lConnection);
 
         lCmd.Parameters.AddWithValue("$InteractionID", (long)aReminder.InteractionID);
         lCmd.Parameters.AddWithValue("$UserID", (long)aReminder.UserID);
+        lCmd.Parameters.AddWithValue("$GuildID", aReminder.GuildID);
         lCmd.Parameters.AddWithValue("$ExpirationDate", aReminder.ExpirationDate.ToString("yyyy-MM-dd HH:mm:ss"));
         lCmd.Parameters.AddWithValue("$Message", aReminder.Message);
         lCmd.ExecuteNonQuery();
@@ -459,7 +462,7 @@ public class DatabaseHelper
         CheckIfRemindMeTableExists(lConnection);
 
         string lTableCmd = @"
-            SELECT InteractionID, UserID, ExpirationDate, Message 
+            SELECT InteractionID, UserID, GuildID, ExpirationDate, Message 
             FROM RemindMeMessage
             WHERE ExpirationDate <= datetime('now', '+24 hours')";
             
@@ -468,6 +471,7 @@ public class DatabaseHelper
 
         var lInteractionIDOrdinal = lReader.GetOrdinal("InteractionID");
         var lUserIDOrdinal = lReader.GetOrdinal("UserID");
+        var lGuildIDOrdinal = lReader.GetOrdinal("GuildID");
         var lExpirationDateOrdinal = lReader.GetOrdinal("ExpirationDate");
         var lMessageOrdinal = lReader.GetOrdinal("Message");
 
@@ -478,6 +482,7 @@ public class DatabaseHelper
             {
                 InteractionID = (ulong)lReader.GetInt64(lInteractionIDOrdinal),
                 UserID = (ulong)lReader.GetInt64(lUserIDOrdinal),
+                GuildID = (ulong)lReader.GetInt64(lGuildIDOrdinal),
                 ExpirationDate = ParseDateTime(lReader.GetString(lExpirationDateOrdinal)),
                 Message = lReader.GetString(lMessageOrdinal)
             };
@@ -491,6 +496,7 @@ public class DatabaseHelper
             CREATE TABLE IF NOT EXISTS RemindMeMessage (
                 InteractionID INTEGER PRIMARY KEY,
                 UserID INTEGER NOT NULL,
+                GuildID INTEGER NOT NULL,
                 ExpirationDate TEXT NOT NULL,
                 Message TEXT NOT NULL
             )";

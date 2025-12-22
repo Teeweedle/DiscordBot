@@ -153,7 +153,8 @@ public class MyCommands : ApplicationCommandModule
             new DiscordInteractionResponseBuilder().AsEphemeral(true));
         try
         {
-            await _reminderService.CreateReminder(ctx.Member.Id, aAmount, aUnit, aMessage, ctx.Interaction.Id);
+            await _reminderService.CreateReminder(ctx.Member.Id, ctx.Guild.Id, aAmount, aUnit, aMessage, ctx.Interaction.Id);
+            await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent($"Reminder Set."));
         }
         catch (Exception ex)
         {

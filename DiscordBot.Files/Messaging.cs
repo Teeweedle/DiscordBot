@@ -78,6 +78,14 @@ public class Messaging
 
         await SendWebhookMessageAsync(null, aChannel.Id, lSultryFormat);
     }
+    public async Task SendDMToUserAsync(ReminderRecord aReminder) 
+    {
+        DiscordGuild guild = await _discord.GetGuildAsync(aReminder.GuildID);
+        
+        DiscordMember member = await guild.GetMemberAsync(aReminder.UserID);
+
+        await member.SendMessageAsync(aReminder.Message);
+    }
     /// <summary>
     /// Posts the most interesting message of the day to the testing channel. For testing purposes only
     /// If <paramref name="testMode"/> is true, the message will be posted to the <see cref="BotTestChannelID"/> channel.
@@ -319,7 +327,7 @@ public class Messaging
             await lWebHook.ExecuteAsync(lFooterBuilder);
         }
     }
-        public async Task SendChannelMessageAsync(string aMessage, ulong aChannelID)
+    public async Task SendChannelMessageAsync(string aMessage, ulong aChannelID)
     {
         var lmsgBuilder = new DiscordMessageBuilder();
         lmsgBuilder.WithContent(aMessage);

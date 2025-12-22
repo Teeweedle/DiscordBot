@@ -3,25 +3,22 @@ using Microsoft.Extensions.Hosting;
 public class ReminderChecker : BackgroundService
 {
     private readonly IReminderService _reminderService;
-    public ReminderChecker(IReminderService aReminderService)
+    private readonly ReminderSignal _reminderSignal;
+    public ReminderChecker(IReminderService aReminderService, ReminderSignal aReminderSignal)
     {
         _reminderService = aReminderService;
+        _reminderSignal = aReminderSignal;
     }
     protected override async Task ExecuteAsync(CancellationToken aStoppingToken)
     {
-        //load the days reminders
-        _reminderService.LoadExpiringReminderList();
-
-        while(!aStoppingToken.IsCancellationRequested)
+        while (!aStoppingToken.IsCancellationRequested)
         {
-            var lInterval = _reminderService.GetNextReminderInterval();
-            if (lInterval == TimeSpan.Zero)
-            {
-                await Task.Delay(TimeSpan.FromMinutes(10), aStoppingToken);
-                continue;
-            }
-            await Task.Delay(lInterval, aStoppingToken);
-            await _reminderService.CheckForExpiredReminders(); 
+            _reminderService.LoadExpiringReminderList();
+            await _reminderService.CheckForExpiredReminders();
+
+            TimeSpan lNextInterval = _reminderService.GetNextReminderInterval();
+
+            await _reminderSignal.WaitAsync(lNextInterval);
         }
     }
 }

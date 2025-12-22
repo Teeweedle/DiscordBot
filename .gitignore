@@ -36,9 +36,14 @@ packages/
 *.db-shm
 *.db-wal
 
+# Local database folder (ignored)
+Data/
+
 # Environment variables or secrets
 .env
 appsettings.Development.json
 
 # Publish output
 /publish/
+
+

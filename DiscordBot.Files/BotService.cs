@@ -9,10 +9,13 @@ public class BotService : BackgroundService
     private readonly IChannelScraper _channelScraper;
     private static ulong _guildID = 429063504725671947;
 
-    public BotService(DiscordClient aDiscord, IServiceProvider aServices, IChannelScraper aChannelScraper)
+    public BotService(DiscordClient aDiscord, 
+                    IServiceProvider aServices, 
+                    IChannelScraper aChannelScraper)
     {        
         _discord = aDiscord;
         _services = aServices;
+        //start the channel scraper
         _channelScraper = aChannelScraper;
     }
     protected override async Task ExecuteAsync(CancellationToken aStoppingToken)
@@ -45,5 +48,4 @@ public class BotService : BackgroundService
         }
         Console.WriteLine("All guild commands deleted. Restarting clean…");
     }
-
 }

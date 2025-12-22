@@ -13,7 +13,6 @@ public class ChannelScraper : IChannelScraper
     {
         _discord = aDiscord;
         _dbh = aDb;
-        Console.WriteLine("ChannelScraper constructed");
 
         _discord.GuildDownloadCompleted += OnGuildDownloadCompleted;    
     }
