@@ -56,6 +56,9 @@ class Program
                 services.AddSingleton<MessagingService>();
                 services.AddSingleton<Messaging>();
                 services.AddSingleton<ReminderSignal>();
+                services.AddSingleton<MotdService>();
+                services.AddSingleton<ChannelSummaryService>();
+                services.AddSingleton<ConversationResponse>();
                 services.AddSingleton<IReminderNotifier, MessagingService>();
                 services.AddSingleton<IReminderService, ReminderService>();
                 services.AddSingleton<IChannelScraper, ChannelScraper>();

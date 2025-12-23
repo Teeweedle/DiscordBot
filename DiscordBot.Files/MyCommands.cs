@@ -7,11 +7,21 @@ using Microsoft.Extensions.DependencyInjection;
 public class MyCommands : ApplicationCommandModule
 {   
     private readonly Messaging _messaging;
+    private readonly MessagingService _messagingService;
     private readonly IReminderService _reminderService;
-    public MyCommands(Messaging aMessaging, IReminderService aReminderService)
+    private readonly MotdService _motdService;
+    private readonly ChannelSummaryService _channelSummaryService;
+    public MyCommands(Messaging aMessaging, 
+                    MessagingService aMessagingService,
+                    IReminderService aReminderService, 
+                    MotdService aMotdService, 
+                    ChannelSummaryService aChannelSummaryService)
     {
         _messaging = aMessaging;
+        _messagingService = aMessagingService;
         _reminderService = aReminderService;
+        _motdService = aMotdService;
+        _channelSummaryService = aChannelSummaryService;
     } 
     [SlashCommand("SetMotDChannel", "Set MotD channel for this guild. Requires admin permissions.")]
     [SlashCommandPermissions(Permissions.Administrator)]
@@ -74,13 +84,13 @@ public class MyCommands : ApplicationCommandModule
             new DiscordInteractionResponseBuilder().AsEphemeral(true)
         );
 
-        string lSummary = await _messaging.GetChannelSummaryAsync(ctx.Channel);
+        string lSummary = await _channelSummaryService.GetChannelSummaryAsync(ctx.Channel.Id);
 
         await ctx.EditResponseAsync(new DiscordWebhookBuilder()
             .AddEmbed(new DiscordEmbedBuilder()
                 .WithTitle($"TLDR for #{ctx.Channel.Name}")
                 .WithDescription(lSummary)
-                .WithColor(DiscordColor.Yellow))
+                .WithColor(DiscordColor.Red))
             );
     }
       
@@ -112,7 +122,7 @@ public class MyCommands : ApplicationCommandModule
     }
     [SlashCommand("PostMotD", "Get today's MotD")]
     [SlashCommandPermissions(Permissions.Administrator)]
-    public async Task OTDCommand(InteractionContext ctx)
+    public async Task MotdCommand(InteractionContext ctx)
     {
         if(!ctx.Member.Permissions.HasPermission(Permissions.Administrator))
         {
@@ -122,10 +132,19 @@ public class MyCommands : ApplicationCommandModule
         }
         await ctx.CreateResponseAsync(InteractionResponseType.DeferredChannelMessageWithSource,
             new DiscordInteractionResponseBuilder().AsEphemeral(true));
+
+        var lMotd = await _motdService.GetMotdAsync(DateTime.UtcNow);
+
+        if(lMotd == null)
+        {
+            await _messaging.SendChannelMessageAsync("Today is a slow day in history. No messages were found for today.",
+                        ctx.Channel.Id);        
+            return;
+        }
         try
         {
             // var lStopWatch = Stopwatch.StartNew();
-            await _messaging.PostMotDAsync(ctx.Channel.Id);
+            await _messagingService.PostMotDAsync(lMotd, ctx.Channel.Id);
             // lStopWatch.Stop();
             await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent($"Done."));
         }
@@ -162,5 +181,23 @@ public class MyCommands : ApplicationCommandModule
                 .WithContent($"[RemindMe Error] {ex.GetType().Name}: {ex.Message}"));
             throw;
         }
+    }
+    [SlashCommand("Info", "Command and Channel info for this bot")]
+    [SlashCommandPermissions(Permissions.SendMessages)]
+    public async Task InfoCommand(InteractionContext ctx)
+    {
+        // await ctx.CreateResponseAsync(InteractionResponseType.DeferredChannelMessageWithSource,
+        //     new DiscordInteractionResponseBuilder().AsEphemeral(true));
+        // try
+        // {
+        //     await _messaging.SendInfoAsync(ctx.Channel);
+        //     await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent($"Put Info here."));
+        // }
+        // catch (Exception ex)
+        // {
+        //     await ctx.EditResponseAsync(new DiscordWebhookBuilder()
+        //         .WithContent($"[Info Error] {ex.GetType().Name}: {ex.Message}"));
+        //     throw;
+        // }
     }
 }
