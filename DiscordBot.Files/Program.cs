@@ -59,6 +59,9 @@ class Program
                 services.AddSingleton<MotdService>();
                 services.AddSingleton<ChannelSummaryService>();
                 services.AddSingleton<ConversationResponse>();
+                services.AddSingleton<BotInfoService>();
+                services.AddSingleton<DiscordLookupService>();
+                services.AddSingleton<ReminderService>();
                 services.AddSingleton<IReminderNotifier, MessagingService>();
                 services.AddSingleton<IReminderService, ReminderService>();
                 services.AddSingleton<IChannelScraper, ChannelScraper>();

@@ -21,10 +21,11 @@ public class BotService : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken aStoppingToken)
     {              
         Console.WriteLine($"Today is: {DateOnly.FromDateTime(DateTime.Now)}");
-        
-        RegisterCommands();
 
+        RegisterCommands();
+        
         await _discord.ConnectAsync();
+
         Console.WriteLine($"Guild count after connect: {_discord.Guilds.Count}");
         // await DeleteCommands();  //for testing
         // Keep the program running
@@ -36,6 +37,11 @@ public class BotService : BackgroundService
         {
             Services = _services
         });
+        slash.SlashCommandErrored += (s, e) =>
+        {
+            Console.WriteLine($"Error: {e.Exception.Message}");
+            return Task.CompletedTask;
+        };
         slash.RegisterCommands<MyCommands>();
     }
     public async Task DeleteCommands()

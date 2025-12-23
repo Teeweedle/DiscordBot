@@ -249,7 +249,7 @@ public class DatabaseHelper
     /// Returns MOTD channel ID from ChannelInfo.db
     /// </summary>
     /// <returns></returns>
-    public string? GetMoTDChannelID()
+    public string? GetMotdChannelID()
     {
         using var lConnection = new SqliteConnection(_channelInfoConnectionString);
         lConnection.Open();

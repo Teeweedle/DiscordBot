@@ -11,19 +11,22 @@ public class MyCommands : ApplicationCommandModule
     private readonly IReminderService _reminderService;
     private readonly MotdService _motdService;
     private readonly ChannelSummaryService _channelSummaryService;
+    private readonly BotInfoService _botInfoService;
     public MyCommands(Messaging aMessaging, 
                     MessagingService aMessagingService,
                     IReminderService aReminderService, 
                     MotdService aMotdService, 
-                    ChannelSummaryService aChannelSummaryService)
+                    ChannelSummaryService aChannelSummaryService,
+                    BotInfoService aBotInfoService)
     {
         _messaging = aMessaging;
         _messagingService = aMessagingService;
         _reminderService = aReminderService;
         _motdService = aMotdService;
         _channelSummaryService = aChannelSummaryService;
+        _botInfoService = aBotInfoService;
     } 
-    [SlashCommand("SetMotDChannel", "Set MotD channel for this guild. Requires admin permissions.")]
+    [SlashCommand("SetMotDChannel", "Sets the channel to send MotD to. Requires admin permissions.")]
     [SlashCommandPermissions(Permissions.Administrator)]
     public async Task SetMOTDChannelCommand(InteractionContext ctx, [Option("channel", "Channel to set")] DiscordChannel aChannel)
     {
@@ -39,7 +42,7 @@ public class MyCommands : ApplicationCommandModule
 
         await ctx.CreateResponseAsync($"Set MotD channel to {aChannel.Name}");
     } 
-    [SlashCommand("SetMotDWeightedChannel", "Set weighted channel for MotD functionality. Requires admin permissions.")]
+    [SlashCommand("SetMotDWeightedChannel", "Sets the weighted channel messages in this channel are more likely to be picked.")]
     [SlashCommandPermissions(Permissions.Administrator)]
     public async Task SetMOTDWeightedChannelCommand(InteractionContext ctx, [Option("channel", "Channel to set")] DiscordChannel channel)
     {
@@ -75,7 +78,7 @@ public class MyCommands : ApplicationCommandModule
 
         await ctx.CreateResponseAsync($"Current weighted channel is {channel?.Name}.");
     }   
-    [SlashCommand("TLDR", "Get TLDR for this channel.")]
+    [SlashCommand("TLDR", "Get a summary of the past 24 hours in the current channel.")]
     [SlashRequirePermissions(Permissions.SendMessages)]
     public async Task TLDRCommand(InteractionContext ctx)
     {
@@ -94,7 +97,7 @@ public class MyCommands : ApplicationCommandModule
             );
     }
       
-    [SlashCommand("SetTarget", "Set target user and target channel for responses. Requires admin permissions.")]
+    [SlashCommand("SetTarget", "he bot will respond to this user. Requires admin permissions.")]
     [SlashCommandPermissions(Permissions.Administrator)]
     public async Task SetTargetCommand(InteractionContext ctx, 
                             [Option("user", "User to set")] DiscordUser aUser, 
@@ -120,7 +123,7 @@ public class MyCommands : ApplicationCommandModule
                 new DiscordInteractionResponseBuilder().WithContent($"[SetTarget Error] {ex.GetType().Name}: {ex.Message}"));
         }       
     }
-    [SlashCommand("PostMotD", "Get today's MotD")]
+    [SlashCommand("PostMotD", "Posts the MotD for today in the channel you use this command in")]
     [SlashCommandPermissions(Permissions.Administrator)]
     public async Task MotdCommand(InteractionContext ctx)
     {
@@ -155,7 +158,7 @@ public class MyCommands : ApplicationCommandModule
             throw;
         }        
     }
-    [SlashCommand("RemindMe", "Remind me when...")]
+    [SlashCommand("RemindMe", "Sets a custom reminder for you to be reminded of something in the future")]
     [SlashCommandPermissions(Permissions.SendMessages)]
     public async Task RemindMeCommand(InteractionContext ctx, 
                             [Option("amount", "Numerical Value")] long aAmount, 
@@ -186,18 +189,43 @@ public class MyCommands : ApplicationCommandModule
     [SlashCommandPermissions(Permissions.SendMessages)]
     public async Task InfoCommand(InteractionContext ctx)
     {
-        // await ctx.CreateResponseAsync(InteractionResponseType.DeferredChannelMessageWithSource,
-        //     new DiscordInteractionResponseBuilder().AsEphemeral(true));
-        // try
-        // {
-        //     await _messaging.SendInfoAsync(ctx.Channel);
-        //     await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent($"Put Info here."));
-        // }
-        // catch (Exception ex)
-        // {
-        //     await ctx.EditResponseAsync(new DiscordWebhookBuilder()
-        //         .WithContent($"[Info Error] {ex.GetType().Name}: {ex.Message}"));
-        //     throw;
-        // }
+        await ctx.CreateResponseAsync(InteractionResponseType.DeferredChannelMessageWithSource,
+            new DiscordInteractionResponseBuilder().AsEphemeral(true));
+
+        try
+        {
+            BotInfoDTO lInfo = await _botInfoService.GetChannelInfo();
+
+            var lEmbed = new DiscordEmbedBuilder()
+                .WithDescription("**/setmotdchannel** - Sets the channel to send MotD to\n" +
+                                "**/setmotdweightedchannel** - Sets the weighted channel messages in this channel are more likely to be picked\n" +
+                                "**/settargetuser** - The bot will respond to this user\n" +
+                                "**/settargetchannel** - The bot will respond to the chosen user in this channel\n" +
+                                "**/postmotd** - Posts the MotD for today in the channel you use this command in\n" +
+                                "**/remindme** - Sets a custom reminder for you to be reminded of something in the future\n" +
+                                "**/tldr** - Get a summary of the past 24 hours in the current channel\n" +
+                                "**/info** - Command and Channel info for this bot")
+                .WithTitle("Info for the bot")
+                .AddField("📢 **MotD Channel**", 
+                    lInfo.MotdChannel is null ? "Not Set" : lInfo.MotdChannel, inline: true)
+                .AddField("💪 **Weighted Channel**", 
+                    lInfo.WeightedChannel is null ? "Not Set" : lInfo.WeightedChannel, inline: true)
+                .AddField("🎯 **Target User**", 
+                    lInfo.TargetUser is null ? "Not Set" : lInfo.TargetUser, inline: true)
+                .AddField("👤 **Target Channel**", 
+                    lInfo.TargetChannel is null ? "Not Set" : lInfo.TargetChannel, inline: true)
+                .AddField("**Has MotD been posted**", 
+                    lInfo.HasMotdBeenPosted.ToString(), inline: true)
+                .WithColor(DiscordColor.Green)
+                .Build();
+
+            await ctx.EditResponseAsync(new DiscordWebhookBuilder().AddEmbed(lEmbed));
+        }        
+        catch (Exception ex)
+        {
+            await ctx.EditResponseAsync(new DiscordWebhookBuilder()
+                .WithContent($"[Info Error] {ex.GetType().Name}: {ex.Message}"));
+            Console.WriteLine($"[Info Error] {ex}");
+        }
     }
 }

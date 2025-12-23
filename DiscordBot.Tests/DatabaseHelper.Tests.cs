@@ -43,19 +43,19 @@ public class DatabaseHelperTests
     public void SetMotDChannel_StoreValues()
     {
         _testDB.SetMotDChannel("123", "234");
-        Assert.That(_testDB.GetMoTDChannelID(), Is.EqualTo("234"));
+        Assert.That(_testDB.GetMotdChannelID(), Is.EqualTo("234"));
     }
     [Test]
     public void SetMotDChannel_UpdateValues()
     {
         _testDB.SetMotDChannel("123", "234");
         _testDB.SetMotDChannel("123", "345");
-        Assert.That(_testDB.GetMoTDChannelID(), Is.EqualTo("345"));
+        Assert.That(_testDB.GetMotdChannelID(), Is.EqualTo("345"));
     }
     [Test]
     public void GetMotDChannel_NullWhenNotSet()
     {
-        var result = _testDB.GetMoTDChannelID();
+        var result = _testDB.GetMotdChannelID();
         Assert.That(result, Is.Null);
     }
 }
