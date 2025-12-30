@@ -93,7 +93,7 @@ public class MyCommands : ApplicationCommandModule
             .AddEmbed(new DiscordEmbedBuilder()
                 .WithTitle($"TLDR for #{ctx.Channel.Name}")
                 .WithDescription(lSummary)
-                .WithColor(DiscordColor.Red))
+                .WithColor(DiscordColor.Green))
             );
     }
       
@@ -136,7 +136,7 @@ public class MyCommands : ApplicationCommandModule
         await ctx.CreateResponseAsync(InteractionResponseType.DeferredChannelMessageWithSource,
             new DiscordInteractionResponseBuilder().AsEphemeral(true));
 
-        var lMotd = await _motdService.GetMotdAsync(DateTime.UtcNow);
+        MessageRecord? lMotd = await _motdService.GetMotdAsync(DateTime.UtcNow);
 
         if(lMotd == null)
         {
@@ -149,7 +149,7 @@ public class MyCommands : ApplicationCommandModule
             // var lStopWatch = Stopwatch.StartNew();
             await _messagingService.PostMotDAsync(lMotd, ctx.Channel.Id);
             // lStopWatch.Stop();
-            await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent($"Done."));
+            await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent($"Done ✅"));
         }
         catch (Exception ex)
         {
@@ -176,7 +176,7 @@ public class MyCommands : ApplicationCommandModule
         try
         {
             await _reminderService.CreateReminder(ctx.Member.Id, ctx.Guild.Id, aAmount, aUnit, aMessage, ctx.Interaction.Id);
-            await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent($"Reminder Set."));
+            await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent($"Reminder Set ✅"));
         }
         catch (Exception ex)
         {
@@ -197,25 +197,27 @@ public class MyCommands : ApplicationCommandModule
             BotInfoDTO lInfo = await _botInfoService.GetChannelInfo();
 
             var lEmbed = new DiscordEmbedBuilder()
-                .WithDescription("**/setmotdchannel** - Sets the channel to send MotD to\n" +
-                                "**/setmotdweightedchannel** - Sets the weighted channel messages in this channel are more likely to be picked\n" +
-                                "**/settargetuser** - The bot will respond to this user\n" +
-                                "**/settargetchannel** - The bot will respond to the chosen user in this channel\n" +
-                                "**/postmotd** - Posts the MotD for today in the channel you use this command in\n" +
-                                "**/remindme** - Sets a custom reminder for you to be reminded of something in the future\n" +
-                                "**/tldr** - Get a summary of the past 24 hours in the current channel\n" +
-                                "**/info** - Command and Channel info for this bot")
-                .WithTitle("Info for the bot")
+            .WithTitle("🤖 Bot Configuration & Commands")
+                .WithDescription("### ⚙️ Setup Commands\n" +
+                                "• `/setmotdchannel` - Sets the channel to send MotD to\n" +
+                                "• `/setmotdweightedchannel` - Sets the weighted channel messages in this channel are more likely to be picked\n" +
+                                "• `/settargetuser` - The bot will respond to this user\n" +
+                                "• `/settargetchannel` - The bot will respond to the chosen user in this channel\n" +
+                                "### 🛠️ General Commands\n" +
+                                "• `/postmotd` - Posts the MotD for today in the channel you use this command in\n" +
+                                "• `/remindme` - Sets a custom reminder for you to be reminded of something in the future\n" +
+                                "• `/tldr` - Get a summary of the past 24 hours in the current channel\n" +
+                                "• `/info` - Get info on commands and channels for this bot")
                 .AddField("📢 **MotD Channel**", 
-                    lInfo.MotdChannel is null ? "Not Set" : lInfo.MotdChannel, inline: true)
+                    lInfo.MotdChannel is null ? "❌ *Not Set*" : $"# {lInfo.MotdChannel}", inline: true)
                 .AddField("💪 **Weighted Channel**", 
-                    lInfo.WeightedChannel is null ? "Not Set" : lInfo.WeightedChannel, inline: true)
-                .AddField("🎯 **Target User**", 
-                    lInfo.TargetUser is null ? "Not Set" : lInfo.TargetUser, inline: true)
-                .AddField("👤 **Target Channel**", 
-                    lInfo.TargetChannel is null ? "Not Set" : lInfo.TargetChannel, inline: true)
-                .AddField("**Has MotD been posted**", 
-                    lInfo.HasMotdBeenPosted.ToString(), inline: true)
+                    lInfo.WeightedChannel is null ? "❌ *Not Set*" : $"# {lInfo.WeightedChannel}", inline: true)
+                .AddField("👤 **Target User**", 
+                    lInfo.TargetUser is null ? "❌ *Not Set*" : lInfo.TargetUser, inline: true)
+                .AddField("🎯 **Target Channel**", 
+                    lInfo.TargetChannel is null ? "❌ *Not Set*" : $"# {lInfo.TargetChannel}", inline: true)
+                .AddField("📆 **Has MotD been posted**", 
+                    lInfo.HasMotdBeenPosted ? "✅ Yes" : "❌ No", inline: true)
                 .WithColor(DiscordColor.Green)
                 .Build();
 

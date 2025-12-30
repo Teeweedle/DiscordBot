@@ -104,7 +104,7 @@ public sealed class MotdService
             Interestingness = lFirstMessage.Interestingness
         };
         for(int i = 1; i < aMessages.Count; i++)
-        {
+        {            
             lNewMessage.Content += "\n" + aMessages[i].Content;
             lNewMessage.AttachmentCount += aMessages[i].AttachmentCount;
             lNewMessage.ReactionCount += aMessages[i].ReactionCount;

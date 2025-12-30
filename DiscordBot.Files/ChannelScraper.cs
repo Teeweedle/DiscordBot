@@ -6,14 +6,14 @@ public class ChannelScraper : IChannelScraper
 {
     private readonly DiscordClient _discord;
     private readonly DatabaseHelper _dbh;
-    private readonly Dictionary<ulong, DateTime> _lastChannelSrape = new();
+    private Dictionary<ulong, DateTime> _lastChannelSrape = new();
     private static readonly int ScrapeDelay = 5;
 
     public ChannelScraper(DiscordClient aDiscord, DatabaseHelper aDb)
     {
         _discord = aDiscord;
         _dbh = aDb;
-
+        LoadLastScanned();
         _discord.GuildDownloadCompleted += OnGuildDownloadCompleted;    
     }
     private async Task OnGuildDownloadCompleted(DiscordClient sender, GuildDownloadCompletedEventArgs e)
@@ -56,10 +56,7 @@ public class ChannelScraper : IChannelScraper
                 {
                     if (!m.Author.IsBot)
                     {
-                        if (m.Content.Length > 3 || m.Attachments.Count > 0)
-                        {
-                            SaveMessage(m);
-                        }
+                        SaveMessage(m);
                     }                    
                 }
     
@@ -84,7 +81,7 @@ public class ChannelScraper : IChannelScraper
             {
                 await ScrapeChannelAsync(aChannel);
             }
-            await Task.Delay(TimeSpan.FromMinutes(5));
+            await Task.Delay(TimeSpan.FromMinutes(20));
         }
     }
     private bool CanScrape(DiscordChannel aChannel)
@@ -100,5 +97,9 @@ public class ChannelScraper : IChannelScraper
     private void SaveMessage(DiscordMessage aMessage)
     {
         _dbh.SaveMessage(aMessage);
+    }
+    private void LoadLastScanned()
+    {
+        _lastChannelSrape = _dbh.GetLastScanned();
     }
 }

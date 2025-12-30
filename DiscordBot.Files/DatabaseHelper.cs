@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.Json;
 using DSharpPlus.Entities;
 using Microsoft.Data.Sqlite;
 public class DatabaseHelper
@@ -58,8 +59,6 @@ public class DatabaseHelper
         lCmd.Parameters.AddWithValue("$AuthorID", aMessage.Author.Id.ToString());
         lCmd.Parameters.AddWithValue("$Content", aMessage.Content);
         lCmd.Parameters.AddWithValue("$AttachmentCount", aMessage.Attachments.Count);
-
-        
         lCmd.Parameters.AddWithValue("$ReactionCount", aMessage.Reactions.Count);
         lCmd.Parameters.AddWithValue("$Timestamp", 
                     aMessage.CreationTimestamp.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss"));
@@ -510,5 +509,37 @@ public class DatabaseHelper
                 _dateTimeFormat, 
                 CultureInfo.InvariantCulture, 
                 DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal);
+    }
+    /// <summary>
+    /// Retrieves a dictionary containing the last time a message was scanned for each channel.
+    /// Used for channel scrapping so it doesn't scan channels again after startup.
+    /// </summary>
+    /// <returns>A dictionary where the keys are the channel IDs and the values are the last time a message was scanned for that channel.</returns>
+    public Dictionary<ulong, DateTime> GetLastScanned()
+    {
+        using var lConnection = new SqliteConnection(_messagesConnectionString);
+        lConnection.Open();
+
+        string lTableCmd = @"
+            SELECT ChannelID, MAX(Timestamp) AS LastScanDate
+            FROM Messages
+            GROUP BY ChannelID";
+
+        using var lCmd = new SqliteCommand(lTableCmd, lConnection);
+        using var lReader = lCmd.ExecuteReader();
+
+        var lChannelIDOrdinal = lReader.GetOrdinal("ChannelID");
+        var lLastScanOrdinal = lReader.GetOrdinal("LastScanDate");        
+        Dictionary<ulong, DateTime> lLastScan = new Dictionary<ulong, DateTime>();
+        ulong lChannelID;
+        DateTime lLastScanDate;
+        while (lReader.Read())
+        {
+            lChannelID = ulong.Parse(lReader.GetString(lChannelIDOrdinal));
+            lLastScanDate = ParseDateTime(lReader.GetString(lLastScanOrdinal));
+
+            lLastScan.Add(lChannelID, lLastScanDate);
+        }
+        return lLastScan;            
     }
 }

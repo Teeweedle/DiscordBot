@@ -1,3 +1,5 @@
+using System.ComponentModel;
+
 public sealed class BotInfoService
 {
     private readonly DatabaseHelper _dbh;
@@ -20,7 +22,7 @@ public sealed class BotInfoService
             WeightedChannel = await ResolveChannelName(lWeightedChannelID),
             TargetUser = await ResolveUserName(lTargetUserID),
             TargetChannel = await ResolveChannelName(lTargetChannelID),
-            HasMotdBeenPosted = true //TODO Implement logic
+            HasMotdBeenPosted = await HasMotdBeenPosted(DateTime.UtcNow)
         };
     }
     private async Task<string?> ResolveChannelName(string? aID)
@@ -38,5 +40,12 @@ public sealed class BotInfoService
         if(!ulong.TryParse(aID, out var lUserID)) 
             return null;
         return await _lookup.GetDiscordUserAsync(lUserID);
+    }
+    private async Task<bool> HasMotdBeenPosted(DateTime aDateUTC)
+    {
+        ulong aMOTDChannelID = ulong.Parse(_dbh.GetMotdChannelID() ?? string.Empty);
+        if(aMOTDChannelID == 0) return false;
+        DateTime lLastMotdDate = await _lookup.GetLastMOTDDateAsync(aMOTDChannelID);  
+        return DateTime.UtcNow - lLastMotdDate <= TimeSpan.FromDays(1);
     }
 }

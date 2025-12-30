@@ -57,7 +57,6 @@ public class Messaging
     {
 
         var lBot = await _discord.GetUserAsync(BotID);
-        
         var lWebHookBuilder = new DiscordWebhookBuilder()
             .WithUsername(aFormat.userName)
             .WithContent(aFormat.content)

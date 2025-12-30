@@ -58,7 +58,6 @@ public class MessagingService : IReminderNotifier
         var lMotDFormat = _messaging.MotDFormatter(lOriginalMsg, aBestMsg);
 
         DiscordWebhook lWebHook = await EnsureAvailableWebhookAsync(aChannelID);
-
         await _messaging.SendWebhookMessageAsync(lWebHook, lOriginalMsg, lMotDFormat);                         
     }
     public async Task<DiscordWebhook> EnsureAvailableWebhookAsync(ulong aChannelID)
