@@ -4,10 +4,14 @@ public sealed class BotInfoService
 {
     private readonly DatabaseHelper _dbh;
     private readonly DiscordLookupService _lookup;
-    public BotInfoService(DatabaseHelper aDb, DiscordLookupService aLookup)
+    private readonly MotdService _motdService;
+    public BotInfoService(DatabaseHelper aDb, 
+                        DiscordLookupService aLookup, 
+                        MotdService aMotdService)
     {
         _dbh = aDb;
         _lookup = aLookup;
+        _motdService = aMotdService;
     }
     public async Task<BotInfoDTO> GetChannelInfo()
     {
@@ -22,7 +26,7 @@ public sealed class BotInfoService
             WeightedChannel = await ResolveChannelName(lWeightedChannelID),
             TargetUser = await ResolveUserName(lTargetUserID),
             TargetChannel = await ResolveChannelName(lTargetChannelID),
-            HasMotdBeenPosted = await HasMotdBeenPosted(DateTime.UtcNow)
+            HasMotdBeenPosted = await _motdService.HasMotdBeenPostedAsync(DateTime.UtcNow.Date)
         };
     }
     private async Task<string?> ResolveChannelName(string? aID)
@@ -40,12 +44,5 @@ public sealed class BotInfoService
         if(!ulong.TryParse(aID, out var lUserID)) 
             return null;
         return await _lookup.GetDiscordUserAsync(lUserID);
-    }
-    private async Task<bool> HasMotdBeenPosted(DateTime aDateUTC)
-    {
-        ulong aMOTDChannelID = ulong.Parse(_dbh.GetMotdChannelID() ?? string.Empty);
-        if(aMOTDChannelID == 0) return false;
-        DateTime lLastMotdDate = await _lookup.GetLastMOTDDateAsync(aMOTDChannelID);  
-        return DateTime.UtcNow - lLastMotdDate <= TimeSpan.FromDays(1);
     }
 }

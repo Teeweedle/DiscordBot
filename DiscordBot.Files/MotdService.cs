@@ -1,9 +1,11 @@
-public sealed class MotdService
+public sealed class MotdService : IMotdPostingService
 {
     private readonly DatabaseHelper _dbh;
-    public MotdService(DatabaseHelper aDb)
+    private readonly DiscordLookupService _lookup;
+    public MotdService(DatabaseHelper aDb, DiscordLookupService aLookup)
     {
         _dbh = aDb;
+        _lookup = aLookup;
     }
     /// <summary>
     /// Returns the MessageRecord with the highest interestingness
@@ -66,7 +68,7 @@ public sealed class MotdService
                 MessageRecord lNextMessage = lSortedMessages[j];
                 
                 bool lSameAuthor = lStartNewMessage.AuthorID == lNextMessage.AuthorID;
-                //current message is within 7 minutes of the first message
+                //current message is within 7 minutes of the first message (discord limit)
                 bool lWithin7Minutes = (lNextMessage.Timestamp - lStartNewMessage.Timestamp).TotalMinutes <= 7; 
                 
                 if(!lSameAuthor || !lWithin7Minutes)
@@ -111,4 +113,22 @@ public sealed class MotdService
         }        
         return lNewMessage;
     }
+    /// <summary>
+    /// Checks if a MOTD has been posted within the last 24 hours for the specified motd channel.
+    /// </summary>
+    /// <param name="aDateUTC">The date to check for the MOTD.</param>
+    /// <returns>True if a MOTD has been posted within the last 24 hours, false otherwise.</returns>
+    public async Task<bool> HasMotdBeenPostedAsync(DateTime aDateUTC)
+    {
+        string? lMotdChannelIDString = _dbh.GetMotdChannelID();
+        if(string.IsNullOrEmpty(lMotdChannelIDString)) 
+            return false;
+
+        ulong lMotdChannelID = ulong.Parse(lMotdChannelIDString);
+        DateTime lLastMotdDate = await _lookup.GetLastMOTDDateAsync(lMotdChannelID); 
+
+        return DateTime.UtcNow - lLastMotdDate <= TimeSpan.FromDays(1);
+    }
+    public async Task<DateTime> GetLastMotDDate() => await _lookup.GetLastMOTDDateAsync(ulong.Parse(_dbh.GetMotdChannelID() ?? string.Empty));
+    public async Task<ulong> GetMotdChannelID() => ulong.Parse(_dbh.GetMotdChannelID() ?? string.Empty);
 }

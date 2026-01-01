@@ -47,10 +47,10 @@ public class MessagingService : IReminderNotifier
         await _messaging.SendWebhookMessageAsync(lWebHook, aMessage, lFormat);
     }
     /// <summary>
-    /// Posts the most interesting message of the day to the specified channel.
-    /// If testMode is true, the message will be posted to the <see cref="BotTestChannelID"/> channel.
+    /// Posts the message of the day to the specified channel. Uses a webhook to post the message.
     /// </summary>
-    /// <param name="testMode">If true, the message will be posted to the <see cref="BotTestChannelID"/> channel.</param>
+    /// <param name="aBestMsg">The message to post</param>
+    /// <param name="aChannelID">The channel to post the message to</param>
     public async Task PostMotDAsync(MessageRecord aBestMsg, ulong aChannelID)
     {
         DiscordChannel lSourceChannel = await _discord.GetChannelAsync(ulong.Parse(aBestMsg.ChannelID));
@@ -92,7 +92,11 @@ public class MessagingService : IReminderNotifier
             lWebHook.Token!);
         return await _discord.GetWebhookWithTokenAsync(lWebHook.Id, lWebHook.Token!);
     }
-    
+    public async Task SendEmptyMotdResponseAsync()
+    {
+        await _messaging.SendChannelMessageAsync("Today is a slow day in history. No messages were found for today.", 
+                                                ulong.Parse(_dbh.GetMotdChannelID() ?? string.Empty));;
+    }
     public Task SendReminderAsync(ReminderRecord aReminderRecord)
     {
         throw new NotImplementedException();
