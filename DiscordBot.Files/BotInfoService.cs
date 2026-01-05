@@ -13,12 +13,12 @@ public sealed class BotInfoService
         _lookup = aLookup;
         _motdService = aMotdService;
     }
-    public async Task<BotInfoDTO> GetChannelInfo()
+    public async Task<BotInfoDTO> GetChannelInfo(string aGuildID)
     {
-        string lMotdChannelID = _dbh.GetMotdChannelID() ?? string.Empty;
-        string lWeightedChannelID = _dbh.GetWeightedChannelID() ?? string.Empty;
-        string lTargetUserID = _dbh.GetTargetUserID() ?? string.Empty;
-        string lTargetChannelID = _dbh.GetTargetChannelID() ?? string.Empty;
+        string lMotdChannelID = _dbh.GetMotdChannelID(aGuildID) ?? string.Empty;
+        string lWeightedChannelID = _dbh.GetWeightedChannelID(aGuildID) ?? string.Empty;
+        string lTargetUserID = _dbh.GetTargetUserID(aGuildID) ?? string.Empty;
+        string lTargetChannelID = _dbh.GetTargetChannelID(aGuildID) ?? string.Empty;
         
         return new BotInfoDTO()
         {
@@ -26,7 +26,7 @@ public sealed class BotInfoService
             WeightedChannel = await ResolveChannelName(lWeightedChannelID),
             TargetUser = await ResolveUserName(lTargetUserID),
             TargetChannel = await ResolveChannelName(lTargetChannelID),
-            HasMotdBeenPosted = await _motdService.HasMotdBeenPostedAsync(DateTime.UtcNow.Date)
+            HasMotdBeenPosted = await _motdService.HasMotdBeenPostedAsync(DateTime.UtcNow.Date, aGuildID)
         };
     }
     private async Task<string?> ResolveChannelName(string? aID)

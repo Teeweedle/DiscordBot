@@ -1,4 +1,4 @@
-public sealed class MotdService : IMotdPostingService
+public sealed class MotdService //: IMotdPostingService
 {
     private readonly DatabaseHelper _dbh;
     private readonly DiscordLookupService _lookup;
@@ -26,14 +26,14 @@ public sealed class MotdService : IMotdPostingService
                             $"The attachment count is - {lBestMsg.AttachmentCount}");
         return lBestMsg;
     }
-    public async Task<MessageRecord?> GetMotdAsync(DateTime aDateUTC)
+    public async Task<MessageRecord?> GetMotdAsync(DateTime aDateUTC, ulong aGuildID)
     {
-        List<MessageRecord> lMessages = _dbh.GetTodaysMsgs(DateTime.UtcNow.Date);
+        List<MessageRecord> lMessages = _dbh.GetTodaysMsgs(DateTime.UtcNow.Date, aGuildID.ToString());
         List<MessageRecord> lMergedMessages = MergeMultiPartMessages(lMessages);
 
         if(lMergedMessages.Count == 0) return null;
 
-        string? lWeightedChannelID = _dbh.GetWeightedChannelID()!;
+        string? lWeightedChannelID = _dbh.GetWeightedChannelID(aGuildID.ToString())!;
         var lBestMsg = GetMotD(lMergedMessages, lWeightedChannelID ?? string.Empty);
 
         if(lBestMsg == null) return null;
@@ -97,6 +97,7 @@ public sealed class MotdService : IMotdPostingService
         {
             Content = lFirstMessage.Content,
             AttachmentCount = lFirstMessage.AttachmentCount,
+            AttachmentUrlList = new List<string>(lFirstMessage.AttachmentUrlList),
             ReactionCount = lFirstMessage.ReactionCount,
             Timestamp = lFirstMessage.Timestamp,
             MessageID = lFirstMessage.MessageID,
@@ -110,6 +111,9 @@ public sealed class MotdService : IMotdPostingService
             lNewMessage.Content += "\n" + aMessages[i].Content;
             lNewMessage.AttachmentCount += aMessages[i].AttachmentCount;
             lNewMessage.ReactionCount += aMessages[i].ReactionCount;
+
+            foreach(string url in aMessages[i].AttachmentUrlList) 
+                lNewMessage.AttachmentUrlList.Add(url);
         }        
         return lNewMessage;
     }
@@ -118,9 +122,9 @@ public sealed class MotdService : IMotdPostingService
     /// </summary>
     /// <param name="aDateUTC">The date to check for the MOTD.</param>
     /// <returns>True if a MOTD has been posted within the last 24 hours, false otherwise.</returns>
-    public async Task<bool> HasMotdBeenPostedAsync(DateTime aDateUTC)
+    public async Task<bool> HasMotdBeenPostedAsync(DateTime aDateUTC, string aGuildID)
     {
-        string? lMotdChannelIDString = _dbh.GetMotdChannelID();
+        string? lMotdChannelIDString = _dbh.GetMotdChannelID(aGuildID);
         if(string.IsNullOrEmpty(lMotdChannelIDString)) 
             return false;
 
@@ -129,6 +133,6 @@ public sealed class MotdService : IMotdPostingService
 
         return DateTime.UtcNow - lLastMotdDate <= TimeSpan.FromDays(1);
     }
-    public async Task<DateTime> GetLastMotDDate() => await _lookup.GetLastMOTDDateAsync(ulong.Parse(_dbh.GetMotdChannelID() ?? string.Empty));
-    public async Task<ulong> GetMotdChannelID() => ulong.Parse(_dbh.GetMotdChannelID() ?? string.Empty);
+    // public async Task<DateTime> GetLastMotDDate() => await _lookup.GetLastMOTDDateAsync(ulong.Parse(_dbh.GetMotdChannelID() ?? string.Empty));
+    // public async Task<ulong> GetMotdChannelID() => ulong.Parse(_dbh.GetMotdChannelID() ?? string.Empty);
 }

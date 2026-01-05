@@ -2,9 +2,9 @@
 public class ReminderSignal
 {
     private TaskCompletionSource<bool> _tcs = new TaskCompletionSource<bool>();
-    public Task WaitAsync(TimeSpan aTimeOut)
+    public Task WaitAsync(TimeSpan aTimeOut, CancellationToken aCancellationToken)
     {
-        return Task.WhenAny(_tcs.Task, Task.Delay(aTimeOut));    
+        return Task.WhenAny(_tcs.Task, Task.Delay(aTimeOut, aCancellationToken));    
     }
     public void WakeUp()
     {

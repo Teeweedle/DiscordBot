@@ -25,8 +25,8 @@ public class MessagingService : IReminderNotifier
     {
         if (!e.Author.IsBot)
             _dbh.SaveMessage(e.Message);
-        if(string.Equals(e.Author.Id.ToString(), _dbh.GetTargetUserID(), StringComparison.Ordinal) &&
-            string.Equals(e.Channel.Id.ToString(), _dbh.GetTargetChannelID(), StringComparison.Ordinal))
+        if(string.Equals(e.Author.Id.ToString(), _dbh.GetTargetUserID(e.Guild.Id.ToString()), StringComparison.Ordinal) &&
+            string.Equals(e.Channel.Id.ToString(), _dbh.GetTargetChannelID(e.Guild.Id.ToString()), StringComparison.Ordinal))
         {
             await RespondToUserAsync(e.Message, e.Channel, e.Author);
         }                
@@ -44,7 +44,7 @@ public class MessagingService : IReminderNotifier
         var lFormat = await _messaging.SultryResponseFormat(lReponse, aUser, lGuild);
         DiscordWebhook lWebHook = await EnsureAvailableWebhookAsync(aChannel.Id);
 
-        await _messaging.SendWebhookMessageAsync(lWebHook, aMessage, lFormat);
+        await _messaging.SendWebhookMessageAsync(lWebHook, lFormat, new List<string>());
     }
     /// <summary>
     /// Posts the message of the day to the specified channel. Uses a webhook to post the message.
@@ -58,7 +58,10 @@ public class MessagingService : IReminderNotifier
         var lMotDFormat = _messaging.MotDFormatter(lOriginalMsg, aBestMsg);
 
         DiscordWebhook lWebHook = await EnsureAvailableWebhookAsync(aChannelID);
-        await _messaging.SendWebhookMessageAsync(lWebHook, lOriginalMsg, lMotDFormat);                         
+        await _messaging.SendWebhookMessageAsync(lWebHook, lMotDFormat, aBestMsg.AttachmentUrlList);
+
+         //record date posted
+        _dbh.SetLastMotdDate(DateTime.UtcNow.Date, lSourceChannel.GuildId!.Value);                        
     }
     public async Task<DiscordWebhook> EnsureAvailableWebhookAsync(ulong aChannelID)
     {
@@ -94,8 +97,14 @@ public class MessagingService : IReminderNotifier
     }
     public async Task SendEmptyMotdResponseAsync()
     {
-        await _messaging.SendChannelMessageAsync("Today is a slow day in history. No messages were found for today.", 
-                                                ulong.Parse(_dbh.GetMotdChannelID() ?? string.Empty));;
+        // await _messaging.SendChannelMessageAsync("Today is a slow day in history. No messages were found for today.", 
+        //                                         ulong.Parse(_dbh.GetMotdChannelID() ?? string.Empty));;
+    }
+    public async Task SendMissingMotdChannelAsync()
+    {
+        //TODO: Change to DM
+        // await _messaging.SendChannelMessageAsync("The MOTD channel has not been set. Please use `/setmotdchannel` to set it.", 
+        //                                         ulong.Parse(_dbh.GetMotdChannelID() ?? string.Empty));
     }
     public Task SendReminderAsync(ReminderRecord aReminderRecord)
     {

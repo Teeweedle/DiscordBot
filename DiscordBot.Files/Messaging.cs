@@ -1,3 +1,4 @@
+using System.Text;
 using DSharpPlus;
 using DSharpPlus.Entities;
 
@@ -15,19 +16,22 @@ public class Messaging
     }     
     public async Task SendDMToUserAsync(ReminderRecord aReminder) 
     {
-        DiscordGuild guild = await _discord.GetGuildAsync(aReminder.GuildID);
+        DiscordGuild lGuild = await _discord.GetGuildAsync(aReminder.GuildID);
         
-        DiscordMember member = await guild.GetMemberAsync(aReminder.UserID);
+        DiscordMember lMember = await lGuild.GetMemberAsync(aReminder.UserID);
 
-        await member.SendMessageAsync(aReminder.Message);
-    }    
-
+        await lMember.SendMessageAsync(aReminder.Message);
+    }
+    public async Task SendDMToOwnerAsync(string aMessage) 
+    {
+        DiscordGuild lGuild = await _discord.GetGuildAsync(ulong.Parse("1428047784245854310"));
+    } 
     public (string, string, string?) MotDFormatter(DiscordMessage aMsg, MessageRecord aBestMsg)
     {
         string lUserName = $"\nOn this day in {aBestMsg.Timestamp.Year}";
         string lContent = $"------------------------------------------------\n" 
-                + $"<@{aBestMsg.AuthorID}> said: \n"
-                + $"{aBestMsg.Content} \n\n";
+                + $"<@{aBestMsg.AuthorID}> said:"
+                + $"{aBestMsg.Content}";
         string lFooter = $"------------------------------------------------\n" 
                 + $"[view orignal message]({aMsg.JumpLink})";
 
@@ -52,24 +56,14 @@ public class Messaging
     /// <returns></returns>
     public async Task SendWebhookMessageAsync(
                         DiscordWebhook aWebhook,
-                        DiscordMessage? aMessage, 
-                        (string userName, string content, string? footer) aFormat)    
+                        (string userName, string content, string? footer) aFormat,
+                        List<string> aUrlList)    
     {
-
         var lBot = await _discord.GetUserAsync(BotID);
         var lWebHookBuilder = new DiscordWebhookBuilder()
             .WithUsername(aFormat.userName)
-            .WithContent(aFormat.content)
-            .WithAvatarUrl(lBot.AvatarUrl);
-
-        if(aMessage != null)
-        {
-           foreach (var attachment in aMessage.Attachments)
-            {
-                var lStream = await _httpClient.GetStreamAsync(attachment.Url);
-                lWebHookBuilder.AddFile(attachment.FileName, lStream);
-            } 
-        }    
+            .WithContent(BuildContent(aFormat.content, aUrlList))
+            .WithAvatarUrl(lBot.AvatarUrl); 
         
         await aWebhook.ExecuteAsync(lWebHookBuilder);
 
@@ -81,6 +75,15 @@ public class Messaging
                 .WithAvatarUrl(lBot.AvatarUrl);
             await aWebhook.ExecuteAsync(lFooterBuilder);
         }
+    }
+    public string BuildContent(string aContent, List<string> aUrlList)
+    {
+        StringBuilder lContent = new StringBuilder(aContent);
+
+        foreach (var url in aUrlList)
+            lContent.Append("\n").Append(url);
+
+        return lContent.ToString().TrimEnd();
     }
     public async Task SendChannelMessageAsync(string aMessage, ulong aChannelID)
     {

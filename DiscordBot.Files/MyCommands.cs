@@ -63,12 +63,13 @@ public class MyCommands : ApplicationCommandModule
     public async Task GetCurrentWeightedChannelCommand(InteractionContext ctx)
     {
         var ldb = ctx.Services.GetRequiredService<DatabaseHelper>();
+        ulong lGuildID = ctx.Guild.Id;
         if(ctx.Guild == null)
         {
             await ctx.CreateResponseAsync("You must be in a guild to use this command.");
             return;
         } 
-        string? lChannelID = ldb.GetWeightedChannelID();
+        string? lChannelID = ldb.GetWeightedChannelID(lGuildID.ToString());
         if(string.IsNullOrEmpty(lChannelID))
         {
             await ctx.CreateResponseAsync("No weighted channel set.");
@@ -112,7 +113,7 @@ public class MyCommands : ApplicationCommandModule
         try
         {
             var lDB = ctx.Services.GetRequiredService<DatabaseHelper>();
-            lDB.SetTargetUserAndChannel(aUser.Id.ToString(), aChannel.Id.ToString());
+            lDB.SetTargetUserAndChannel(aUser.Id.ToString(), aChannel.Id.ToString(), ctx.Guild.Id.ToString() );
     
             await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
                 new DiscordInteractionResponseBuilder().WithContent($"Set target to {aUser.Username} in {aChannel.Name}.")); 
@@ -127,6 +128,9 @@ public class MyCommands : ApplicationCommandModule
     [SlashCommandPermissions(Permissions.Administrator)]
     public async Task MotdCommand(InteractionContext ctx)
     {
+        ulong lGuildID = ctx.Guild.Id;
+        ulong lChannelID = ctx.Channel.Id;
+
         if(!ctx.Member.Permissions.HasPermission(Permissions.Administrator))
         {
             await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
@@ -136,20 +140,20 @@ public class MyCommands : ApplicationCommandModule
         await ctx.CreateResponseAsync(InteractionResponseType.DeferredChannelMessageWithSource,
             new DiscordInteractionResponseBuilder().AsEphemeral(true));
 
-        MessageRecord? lMotd = await _motdService.GetMotdAsync(DateTime.UtcNow);
+        MessageRecord? lMotd = await _motdService.GetMotdAsync(DateTime.UtcNow, lGuildID);
 
         if(lMotd == null)
         {
             await _messaging.SendChannelMessageAsync("Today is a slow day in history. No messages were found for today.",
-                        ctx.Channel.Id);        
+                        lChannelID);        
             return;
         }
         try
         {
             // var lStopWatch = Stopwatch.StartNew();
-            await _messagingService.PostMotDAsync(lMotd, ctx.Channel.Id);
+            await _messagingService.PostMotDAsync(lMotd, lChannelID);
             // lStopWatch.Stop();
-            await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent($"Done ✅"));
+            await ctx.DeleteResponseAsync();
         }
         catch (Exception ex)
         {
@@ -189,12 +193,13 @@ public class MyCommands : ApplicationCommandModule
     [SlashCommandPermissions(Permissions.SendMessages)]
     public async Task InfoCommand(InteractionContext ctx)
     {
+        ulong lGuildID = ctx.Guild.Id;
         await ctx.CreateResponseAsync(InteractionResponseType.DeferredChannelMessageWithSource,
             new DiscordInteractionResponseBuilder().AsEphemeral(true));
 
         try
         {
-            BotInfoDTO lInfo = await _botInfoService.GetChannelInfo();
+            BotInfoDTO lInfo = await _botInfoService.GetChannelInfo(lGuildID.ToString());
 
             var lEmbed = new DiscordEmbedBuilder()
             .WithTitle("🤖 Bot Configuration & Commands")

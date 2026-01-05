@@ -67,6 +67,7 @@ class Program
                 services.AddSingleton<IChannelScraper, ChannelScraper>();
 
                 services.AddHostedService<ReminderChecker>();
+                // services.AddHostedService<MotdPoster>();
                 services.AddHostedService<BotService>();
             });
 }

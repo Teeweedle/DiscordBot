@@ -18,7 +18,7 @@ public class ReminderChecker : BackgroundService
 
             TimeSpan lNextInterval = _reminderService.GetNextReminderInterval();
 
-            await _reminderSignal.WaitAsync(lNextInterval);
+            await _reminderSignal.WaitAsync(lNextInterval, aStoppingToken);
         }
     }
 }

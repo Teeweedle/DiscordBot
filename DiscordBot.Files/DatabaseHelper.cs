@@ -7,50 +7,70 @@ public class DatabaseHelper
     private static readonly string _folderPath = Path.GetFullPath(
                                                     Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "data"));
     private static readonly string _messagesDBPath = Path.Combine(_folderPath, "Messages.db");
-    private static readonly string _channelInfoDBPath = Path.Combine(_folderPath, "ChannelInfo.db");
     private static readonly string _webhookInfoDBPath = Path.Combine(_folderPath, "WebhookInfo.db");
     private static readonly string _targetUserAndChannelDBPath = Path.Combine(_folderPath, "TargetUserAndChannel.db");
     private static readonly string _remindMeDBPath = Path.Combine(_folderPath, "RemindMe.db");
+    private static readonly string _motdSettingsDBPath = Path.Combine(_folderPath, "MotdSettings.db");
+    private static readonly string _channelScrapInfoDBPath = Path.Combine(_folderPath, "ChannelScrapeInfo.db");
     private readonly string _messagesConnectionString = $"Data Source={_messagesDBPath}";
-    private string _channelInfoConnectionString = $"Data Source={_channelInfoDBPath}";
     private string _webhookInfoConnectionString = $"Data Source={_webhookInfoDBPath}";
     private string _targetUserAndChannelConnectionString = $"Data Source={_targetUserAndChannelDBPath}";
     private string _remindMeConnectionString = $"Data Source={_remindMeDBPath}";
+    private string _motdSettingsConnectionString = $"Data Source={_motdSettingsDBPath}";
+    private string _channelScrapeInfoConnectionString = $"Data Source={_channelScrapInfoDBPath}";
     private const string _dateTimeFormat = "yyyy-MM-dd HH:mm:ss";
 
-    public DatabaseHelper(string? aConnectionString = null)
+    public DatabaseHelper()
     {
-        _channelInfoConnectionString = aConnectionString ?? _channelInfoConnectionString;
-
-        if (aConnectionString == null)
-        {
-            if (!Directory.Exists(_folderPath))
-                Directory.CreateDirectory(_folderPath);
-            using var lConnection = new SqliteConnection(_messagesConnectionString);
-            lConnection.Open();
     
-            string lTableCmd = @"CREATE TABLE IF NOT EXISTS Messages(
-                MessageID TEXT PRIMARY KEY,
-                GuildID TEXT,
-                ChannelID TEXT,
-                AuthorID TEXT,
-                Content TEXT,
-                AttachmentCount INTEGER,
-                ReactionCount INTEGER,
-                Timestamp TEXT
-            )";
-            using var createCmd = new SqliteCommand(lTableCmd, lConnection);
-            createCmd.ExecuteNonQuery();
+        if (!Directory.Exists(_folderPath))
+            Directory.CreateDirectory(_folderPath);
+
+        EnsureTablesExist();        
+    }
+    private void EnsureTablesExist()
+    {
+        using(var lConnection = new SqliteConnection(_messagesConnectionString))
+        {
+            lConnection.Open();
+            CheckMessagesTableExists(lConnection);
+        }
+
+        using(var lConnection = new SqliteConnection(_motdSettingsConnectionString))
+        {
+            lConnection.Open();
+            CheckMotdSettingsTableExists(lConnection);
+        }
+        using(var lConnection = new SqliteConnection(_webhookInfoConnectionString))
+        {
+            lConnection.Open();
+            CheckWebHookTableExists(lConnection);
+        }
+        using(var lConnection = new SqliteConnection(_targetUserAndChannelConnectionString))
+        {
+            lConnection.Open();
+            CheckIfTargetUserAndChannelSet(lConnection);
+        }
+        using(var lConnection = new SqliteConnection(_remindMeConnectionString))
+        {
+            lConnection.Open();
+            CheckIfRemindMeTableExists(lConnection);
+        }
+        using(var lConnection = new SqliteConnection(_channelScrapeInfoConnectionString))
+        {
+            lConnection.Open();
+            CheckIfChannelScrapeInfoTableExists(lConnection);
         }
     }
+
     public void SaveMessage(DiscordMessage aMessage)
     {
         using var lConnection = new SqliteConnection(_messagesConnectionString);
         lConnection.Open();
 
         string lInsertCmd = @"INSERT OR REPLACE INTO Messages
-            (MessageID, GuildID, ChannelID, AuthorID, Content, AttachmentCount, ReactionCount, Timestamp)
-            VALUES ($MessageID, $GuildID, $ChannelID, $AuthorID, $Content, $AttachmentCount, $ReactionCount, $Timestamp)";
+            (MessageID, GuildID, ChannelID, AuthorID, Content, AttachmentCount, AttachmentUrl, ReactionCount, Timestamp)
+            VALUES ($MessageID, $GuildID, $ChannelID, $AuthorID, $Content, $AttachmentCount, $AttachmentUrl, $ReactionCount, $Timestamp)";
 
         using var lCmd = new SqliteCommand(lInsertCmd, lConnection);
         lCmd.Parameters.AddWithValue("$MessageID", aMessage.Id.ToString());
@@ -59,6 +79,13 @@ public class DatabaseHelper
         lCmd.Parameters.AddWithValue("$AuthorID", aMessage.Author.Id.ToString());
         lCmd.Parameters.AddWithValue("$Content", aMessage.Content);
         lCmd.Parameters.AddWithValue("$AttachmentCount", aMessage.Attachments.Count);
+
+        List<string> lAttachmentUrls = aMessage.Attachments
+                                    .Select(attachment => attachment.Url)
+                                    .ToList();
+        string lSerializedUrls = JsonSerializer.Serialize(lAttachmentUrls);
+
+        lCmd.Parameters.AddWithValue("$AttachmentUrl", lSerializedUrls);
         lCmd.Parameters.AddWithValue("$ReactionCount", aMessage.Reactions.Count);
         lCmd.Parameters.AddWithValue("$Timestamp", 
                     aMessage.CreationTimestamp.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss"));
@@ -69,7 +96,7 @@ public class DatabaseHelper
     /// Returns all messages from the database that share today's date
     /// </summary>
     /// <returns>List of MessageRecords</returns>
-    public List<MessageRecord> GetTodaysMsgs(DateTime aCurrentDate)
+    public List<MessageRecord> GetTodaysMsgs(DateTime aCurrentDate, string aGuildID)
     {
         using var lConnection = new SqliteConnection(_messagesConnectionString);
         Console.WriteLine($"Connection string: {_messagesConnectionString}");
@@ -88,10 +115,12 @@ public class DatabaseHelper
         lCmd.CommandText = @"
                             SELECT *
                             FROM Messages
-                            WHERE strftime('%m', Timestamp) = $Month
+                            WHERE GuildID = $GuildID
+                                AND strftime('%m', Timestamp) = $Month
                                 AND strftime('%d', Timestamp) = $Day
                                 AND strftime('%Y', Timestamp) = $Year
                                 AND (LENGTH(Content) > 3 OR AttachmentCount > 0)";
+        lCmd.Parameters.AddWithValue("$GuildID", aGuildID);
         lCmd.Parameters.AddWithValue("$Month", aCurrentDate.Month.ToString("D2")); 
         lCmd.Parameters.AddWithValue("$Day", aCurrentDate.Day.ToString("D2"));
         lCmd.Parameters.AddWithValue("$Year", lYear.ToString());
@@ -99,6 +128,8 @@ public class DatabaseHelper
         using var lReader = lCmd.ExecuteReader();
         while (lReader.Read())
         {
+            string lSerializedUrls = lReader.GetString(lReader.GetOrdinal("AttachmentUrl"));
+
             lMessages.Add(new MessageRecord
             {
                 MessageID = lReader.GetString(lReader.GetOrdinal("MessageID")),
@@ -107,6 +138,7 @@ public class DatabaseHelper
                 AuthorID = lReader.GetString(lReader.GetOrdinal("AuthorID")),
                 Content = lReader.GetString(lReader.GetOrdinal("Content")),
                 AttachmentCount = lReader.GetInt32(lReader.GetOrdinal("AttachmentCount")),
+                AttachmentUrlList = JsonSerializer.Deserialize<List<string>>(lSerializedUrls) ?? new List<string>(),
                 ReactionCount = lReader.GetInt32(lReader.GetOrdinal("ReactionCount")),
                 Timestamp = DateTime.Parse(lReader.GetString(lReader.GetOrdinal("Timestamp")), 
                                                 null, System.Globalization.DateTimeStyles.AssumeLocal)
@@ -183,23 +215,21 @@ public class DatabaseHelper
     /// Sets MOTD channel for this guild. Saves it to database located in data folder ChannelInfo.db
     /// </summary>
     /// <param name="aGuildID">Discord guild ID</param>
-    /// <param name="aChannelID">MOTD channel ID</param>
-    public void SetMotDChannel(string aGuildID, string aChannelID)
+    /// <param name="aMotdChannelID">MOTD channel ID</param>
+    public void SetMotDChannel(string aGuildID, string aMotdChannelID)
     {
-        using var lConnection = new SqliteConnection(_channelInfoConnectionString);
+        using var lConnection = new SqliteConnection(_motdSettingsConnectionString);
         lConnection.Open();
 
-        CheckChannelTableExists(lConnection);
-
         string lInsertCmd = @"
-            INSERT INTO ChannelInfo (GuildID, MoTDChannelID) 
-            VALUES ($GuildID, $MoTDChannelID) 
-            ON CONFLICT (GuildID) DO UPDATE SET MoTDChannelID = $MoTDChannelID";
+            INSERT INTO MotdSettings (GuildID, MotdChannelID) 
+            VALUES ($GuildID, $MotdChannelID) 
+            ON CONFLICT (GuildID) DO UPDATE SET MotdChannelID = $MotdChannelID";
 
         using var lCmd = new SqliteCommand(lInsertCmd, lConnection);
 
         lCmd.Parameters.AddWithValue("$GuildID", aGuildID);
-        lCmd.Parameters.AddWithValue("$MoTDChannelID", aChannelID);
+        lCmd.Parameters.AddWithValue("$MotdChannelID", aMotdChannelID);
         lCmd.ExecuteNonQuery();
     }
     /// <summary>
@@ -209,13 +239,11 @@ public class DatabaseHelper
     /// <param name="aChannelID">Weighted channel ID</param>
     public void SetWeightedChannel(string aGuildID, string aChannelID)
     {
-        using var lConnection = new SqliteConnection(_channelInfoConnectionString);
+        using var lConnection = new SqliteConnection(_motdSettingsConnectionString);
         lConnection.Open();
 
-        CheckChannelTableExists(lConnection);
-
         string lInsertCmd = @"
-            INSERT INTO ChannelInfo (GuildID, WeightedChannelID) 
+            INSERT INTO MotdSettings (GuildID, WeightedChannelID) 
             VALUES ($GuildID, $WeightedChannelID) 
             ON CONFLICT (GuildID) DO UPDATE SET WeightedChannelID = $WeightedChannelID";
 
@@ -229,18 +257,19 @@ public class DatabaseHelper
     /// Returns weighted channel ID from ChannelInfo.db
     /// </summary>
     /// <returns></returns>
-    public string? GetWeightedChannelID()
+    public string? GetWeightedChannelID(string aGuildID)
     {
-        using var lConnection = new SqliteConnection(_channelInfoConnectionString);
+        using var lConnection = new SqliteConnection(_motdSettingsConnectionString);
         lConnection.Open();
 
         string lSql = @"
             SELECT WeightedChannelID 
-            FROM ChannelInfo 
+            FROM MotdSettings
+            WHERE GuildID = $GuildID 
             LIMIT 1";
             
         using var lCmd = new SqliteCommand(lSql, lConnection);
-        
+        lCmd.Parameters.AddWithValue("$GuildID", aGuildID);        
         var result = lCmd.ExecuteScalar();
         return result?.ToString();          
     }
@@ -248,33 +277,35 @@ public class DatabaseHelper
     /// Returns MOTD channel ID from ChannelInfo.db
     /// </summary>
     /// <returns></returns>
-    public string? GetMotdChannelID()
+    public string? GetMotdChannelID(string aGuildID)
     {
-        using var lConnection = new SqliteConnection(_channelInfoConnectionString);
+        using var lConnection = new SqliteConnection(_motdSettingsConnectionString);
         lConnection.Open();
 
         string lSql = @"
-            SELECT MoTDChannelID 
-            FROM ChannelInfo
+            SELECT MotdChannelID 
+            FROM MotdSettings
+            WHERE GuildID = $GuildID
             LIMIT 1";
             
         using var lCmd = new SqliteCommand(lSql, lConnection);
+        lCmd.Parameters.AddWithValue("$GuildID", aGuildID);
         
         var result = lCmd.ExecuteScalar();
         return result?.ToString();
     }
-    private void CheckChannelTableExists(SqliteConnection aConnection)
+    private void CheckMotdSettingsTableExists(SqliteConnection aConnection)
     {
       string lTableCmd = @"
-            CREATE TABLE IF NOT EXISTS ChannelInfo (
+            CREATE TABLE IF NOT EXISTS MotdSettings (
                 GuildID TEXT PRIMARY KEY,
+                MotdChannelID TEXT,
                 WeightedChannelID TEXT,
-                MoTDChannelID TEXT,
-                TLDRChannelID TEXT
+                LastMotdDate TEXT
             )";
         using var createCmd = new SqliteCommand(lTableCmd, aConnection);
         createCmd.ExecuteNonQuery();
-    }
+     }  
     private void CheckWebHookTableExists(SqliteConnection aConnection)
     {
       string lTableCmd = @"
@@ -292,8 +323,6 @@ public class DatabaseHelper
     {
         using var lConnection = new SqliteConnection(_webhookInfoConnectionString);
         lConnection.Open();
-
-        CheckWebHookTableExists(lConnection);
 
         string lInsertCmd = @"
             INSERT INTO WebhookInfo (GuildID, ChannelID, WebhookID, WebhookToken) 
@@ -319,8 +348,6 @@ public class DatabaseHelper
     {
         using var lConnection = new SqliteConnection(_webhookInfoConnectionString);
         lConnection.Open();
-
-        CheckWebHookTableExists(lConnection);
 
         string lSql = @"
             SELECT WebhookID 
@@ -357,50 +384,54 @@ public class DatabaseHelper
         var result = lCmd.ExecuteScalar();
         return result?.ToString();
     }
-    public void SetTargetUserAndChannel(string aUserID, string aChannelID)
+    public void SetTargetUserAndChannel(string aUserID, string aChannelID, string aGuildID)
     {
         using var lConnection = new SqliteConnection(_targetUserAndChannelConnectionString);
         lConnection.Open();
 
-        CheckIfTargetUserAndChannelSet(lConnection);
 
         string lInsertCmd = @"
-            INSERT INTO TargetUserAndChannel (ID, UserID, ChannelID) 
-            VALUES (1, $UserID, $ChannelID) 
-            ON CONFLICT (ID) DO UPDATE SET 
+            INSERT INTO TargetUserAndChannel (GuildID, UserID, ChannelID) 
+            VALUES ($GuildID, $UserID, $ChannelID) 
+            ON CONFLICT (GuildID) DO UPDATE SET 
                 UserID = $UserID, 
                 ChannelID = $ChannelID";
 
         using var lCmd = new SqliteCommand(lInsertCmd, lConnection);
 
+        lCmd.Parameters.AddWithValue("$GuildID", aGuildID);
         lCmd.Parameters.AddWithValue("$UserID", aUserID);
         lCmd.Parameters.AddWithValue("$ChannelID", aChannelID);
         lCmd.ExecuteNonQuery();
     }
-    public string? GetTargetChannelID()
+    public string? GetTargetChannelID(string aGuildID)
     {
         using var lConnection = new SqliteConnection(_targetUserAndChannelConnectionString);
         lConnection.Open();
 
         string lSql = @"
             SELECT ChannelID 
-            FROM TargetUserAndChannel";
+            FROM TargetUserAndChannel
+            WHERE GuildID = $GuildID";
             
         using var lCmd = new SqliteCommand(lSql, lConnection);
+        lCmd.Parameters.AddWithValue("$GuildID", aGuildID);
         
         var result = lCmd.ExecuteScalar();
         return result?.ToString();
     }
-    public string? GetTargetUserID()
+    public string? GetTargetUserID(string aGuildID)
     {
         using var lConnection = new SqliteConnection(_targetUserAndChannelConnectionString);
         lConnection.Open();
 
         string lSql = @"
             SELECT UserID 
-            FROM TargetUserAndChannel";
+            FROM TargetUserAndChannel
+            WHERE GuildID = $GuildID";
             
         using var lCmd = new SqliteCommand(lSql, lConnection);
+        lCmd.Parameters.AddWithValue("$GuildID", aGuildID);
         
         var result = lCmd.ExecuteScalar();
         return result?.ToString();
@@ -409,7 +440,7 @@ public class DatabaseHelper
     {
         string lTableCmd = @"
             CREATE TABLE IF NOT EXISTS TargetUserAndChannel (
-                ID INTEGER PRIMARY KEY Check (ID = 1),
+                GuildID TEXT PRIMARY KEY,
                 UserID TEXT NOT NULL,
                 ChannelID TEXT NOT NULL
             )";
@@ -420,8 +451,6 @@ public class DatabaseHelper
     {
         using var lConnection = new SqliteConnection(_remindMeConnectionString);
         lConnection.Open();
-
-        CheckIfRemindMeTableExists(lConnection);
 
         string lInsertCmd = @"
             INSERT INTO RemindMeMessage (InteractionID, UserID, GuildID, ExpirationDate, Message) 
@@ -457,8 +486,6 @@ public class DatabaseHelper
     {
         using var lConnection = new SqliteConnection(_remindMeConnectionString);        
         lConnection.Open();
-
-        CheckIfRemindMeTableExists(lConnection);
 
         string lTableCmd = @"
             SELECT InteractionID, UserID, GuildID, ExpirationDate, Message 
@@ -541,5 +568,92 @@ public class DatabaseHelper
             lLastScan.Add(lChannelID, lLastScanDate);
         }
         return lLastScan;            
+    }
+    public void SetLastMotdDate(DateTime aDate, ulong aGuildID)
+    {
+        using var lConnection = new SqliteConnection(_motdSettingsConnectionString);
+        lConnection.Open();
+
+        string lSql = @"
+            INSERT INTO MotdSettings (GuildID, LastMotdDate) 
+            VALUES ($GuildID, $Date) 
+            ON CONFLICT (GuildID) DO UPDATE SET LastMotdDate = $Date";
+            
+        using var lCmd = new SqliteCommand(lSql, lConnection);
+        lCmd.Parameters.AddWithValue("$Date", aDate.ToString(_dateTimeFormat));
+        lCmd.Parameters.AddWithValue("$GuildID", aGuildID.ToString());
+        lCmd.ExecuteNonQuery();
+    }
+    private void CheckIfChannelScrapeInfoTableExists(SqliteConnection aConnection)
+    {
+        string lTableCmd = @"CREATE TABLE IF NOT EXISTS ChannelScrapeInfo(
+            GuildID TEXT NOT NULL,
+            ChannelID TEXT NOT NULL,
+            FullyScraped INTEGER NOT NULL DEFAULT 0,
+            LastMessageID TEXT,
+            PRIMARY KEY (GuildID, ChannelID)
+        )";
+        using var createCmd = new SqliteCommand(lTableCmd, aConnection);
+        createCmd.ExecuteNonQuery();
+    }
+    private void CheckMessagesTableExists(SqliteConnection aConnection)
+    {
+            string lTableCmd = @"CREATE TABLE IF NOT EXISTS Messages(
+                MessageID TEXT PRIMARY KEY,
+                GuildID TEXT,
+                ChannelID TEXT,
+                AuthorID TEXT,
+                Content TEXT,
+                AttachmentCount INTEGER,
+                AttachmentUrl TEXT,
+                ReactionCount INTEGER,
+                Timestamp TEXT
+            )";
+            using var createCmd = new SqliteCommand(lTableCmd, aConnection);
+            createCmd.ExecuteNonQuery();
+    }
+    public void SetChannelScrapeState(ulong aGuildID, ulong aChannelID, bool aFullyScraped, string aLastMessageID)
+    {
+        using var lConnection = new SqliteConnection(_channelScrapeInfoConnectionString);
+        lConnection.Open();
+
+        string lTableCmd = @"
+            INSERT INTO ChannelScrapeInfo (GuildID, ChannelID, FullyScraped, LastMessageID) 
+            VALUES ($GuildID, $ChannelID, $FullyScraped, $LastMessageID) 
+            ON CONFLICT (GuildID, ChannelID)
+            DO UPDATE SET
+                FullyScraped = excluded.FullyScraped,
+                LastMessageID = excluded.LastMessageID";
+
+        using var lCmd = new SqliteCommand(lTableCmd, lConnection);
+        lCmd.Parameters.AddWithValue("$GuildID", aGuildID.ToString());
+        lCmd.Parameters.AddWithValue("$ChannelID", aChannelID.ToString());
+        lCmd.Parameters.AddWithValue("$FullyScraped", aFullyScraped ? 1 : 0);
+        lCmd.Parameters.AddWithValue("$LastMessageID", aLastMessageID is null ? DBNull.Value : aLastMessageID);
+        lCmd.ExecuteNonQuery();
+    }
+    public (bool FullyScraped, string? LastMessageID) GetChannelScrapeState(ulong aGuildID, ulong aChannelID)
+    {
+        using var lConnection = new SqliteConnection(_channelScrapeInfoConnectionString);
+        lConnection.Open();
+
+        string lTableCmd = @"
+            SELECT FullyScraped, LastMessageID
+            FROM ChannelScrapeInfo
+            WHERE GuildID = $GuildID AND ChannelID = $ChannelID";
+
+        using var lCmd = new SqliteCommand(lTableCmd, lConnection);
+
+        lCmd.Parameters.AddWithValue("$GuildID", aGuildID.ToString());
+        lCmd.Parameters.AddWithValue("$ChannelID", aChannelID.ToString());
+        using var lReader = lCmd.ExecuteReader();
+
+        if (!lReader.Read())
+            return (false, null);
+
+        bool lFullyScraped = lReader.GetInt32(0) == 1;
+        string? lLastMessageID = lReader.IsDBNull(1) ? null : lReader.GetString(1);
+
+        return (lFullyScraped, lLastMessageID);
     }
 }
