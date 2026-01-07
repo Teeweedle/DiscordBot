@@ -69,8 +69,8 @@ public class DatabaseHelper
         lConnection.Open();
 
         string lInsertCmd = @"INSERT OR REPLACE INTO Messages
-            (MessageID, GuildID, ChannelID, AuthorID, Content, AttachmentCount, AttachmentUrl, ReactionCount, Timestamp)
-            VALUES ($MessageID, $GuildID, $ChannelID, $AuthorID, $Content, $AttachmentCount, $AttachmentUrl, $ReactionCount, $Timestamp)";
+            (MessageID, GuildID, ChannelID, AuthorID, Content, AttachmentCount, ReactionCount, Timestamp)
+            VALUES ($MessageID, $GuildID, $ChannelID, $AuthorID, $Content, $AttachmentCount, $ReactionCount, $Timestamp)";
 
         using var lCmd = new SqliteCommand(lInsertCmd, lConnection);
         lCmd.Parameters.AddWithValue("$MessageID", aMessage.Id.ToString());
@@ -80,12 +80,6 @@ public class DatabaseHelper
         lCmd.Parameters.AddWithValue("$Content", aMessage.Content);
         lCmd.Parameters.AddWithValue("$AttachmentCount", aMessage.Attachments.Count);
 
-        List<string> lAttachmentUrls = aMessage.Attachments
-                                    .Select(attachment => attachment.Url)
-                                    .ToList();
-        string lSerializedUrls = JsonSerializer.Serialize(lAttachmentUrls);
-
-        lCmd.Parameters.AddWithValue("$AttachmentUrl", lSerializedUrls);
         lCmd.Parameters.AddWithValue("$ReactionCount", aMessage.Reactions.Count);
         lCmd.Parameters.AddWithValue("$Timestamp", 
                     aMessage.CreationTimestamp.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss"));
@@ -118,8 +112,7 @@ public class DatabaseHelper
                             WHERE GuildID = $GuildID
                                 AND strftime('%m', Timestamp) = $Month
                                 AND strftime('%d', Timestamp) = $Day
-                                AND strftime('%Y', Timestamp) = $Year
-                                AND (LENGTH(Content) > 3 OR AttachmentCount > 0)";
+                                AND strftime('%Y', Timestamp) = $Year";
         lCmd.Parameters.AddWithValue("$GuildID", aGuildID);
         lCmd.Parameters.AddWithValue("$Month", aCurrentDate.Month.ToString("D2")); 
         lCmd.Parameters.AddWithValue("$Day", aCurrentDate.Day.ToString("D2"));
@@ -128,8 +121,6 @@ public class DatabaseHelper
         using var lReader = lCmd.ExecuteReader();
         while (lReader.Read())
         {
-            string lSerializedUrls = lReader.GetString(lReader.GetOrdinal("AttachmentUrl"));
-
             lMessages.Add(new MessageRecord
             {
                 MessageID = lReader.GetString(lReader.GetOrdinal("MessageID")),
@@ -138,7 +129,6 @@ public class DatabaseHelper
                 AuthorID = lReader.GetString(lReader.GetOrdinal("AuthorID")),
                 Content = lReader.GetString(lReader.GetOrdinal("Content")),
                 AttachmentCount = lReader.GetInt32(lReader.GetOrdinal("AttachmentCount")),
-                AttachmentUrlList = JsonSerializer.Deserialize<List<string>>(lSerializedUrls) ?? new List<string>(),
                 ReactionCount = lReader.GetInt32(lReader.GetOrdinal("ReactionCount")),
                 Timestamp = DateTime.Parse(lReader.GetString(lReader.GetOrdinal("Timestamp")), 
                                                 null, System.Globalization.DateTimeStyles.AssumeLocal)
@@ -605,7 +595,6 @@ public class DatabaseHelper
                 AuthorID TEXT,
                 Content TEXT,
                 AttachmentCount INTEGER,
-                AttachmentUrl TEXT,
                 ReactionCount INTEGER,
                 Timestamp TEXT
             )";

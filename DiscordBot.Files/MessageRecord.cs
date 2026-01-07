@@ -5,7 +5,7 @@ public class MessageRecord
     public string ChannelID { get; set; } = string.Empty;
     public string AuthorID { get; set; } = string.Empty;
     public string Content { get; set; } = string.Empty;
-    public List<string> AttachmentUrlList { get; set; } = new List<string>();
+    public List<string> MessageIDAttachmentList { get; set; } = new List<string>();
     public int AttachmentCount { get; set; }
     public int ReactionCount { get; set; }
     public DateTime Timestamp { get; set; }

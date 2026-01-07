@@ -44,7 +44,7 @@ public class MessagingService : IReminderNotifier
         var lFormat = await _messaging.SultryResponseFormat(lReponse, aUser, lGuild);
         DiscordWebhook lWebHook = await EnsureAvailableWebhookAsync(aChannel.Id);
 
-        await _messaging.SendWebhookMessageAsync(lWebHook, lFormat, new List<string>());
+        await _messaging.SendWebhookMessageAsync(lWebHook, lFormat);
     }
     /// <summary>
     /// Posts the message of the day to the specified channel. Uses a webhook to post the message.
@@ -58,7 +58,7 @@ public class MessagingService : IReminderNotifier
         var lMotDFormat = _messaging.MotDFormatter(lOriginalMsg, aBestMsg);
 
         DiscordWebhook lWebHook = await EnsureAvailableWebhookAsync(aChannelID);
-        await _messaging.SendWebhookMessageAsync(lWebHook, lMotDFormat, aBestMsg.AttachmentUrlList);
+        await _messaging.SendWebhookMessageAsync(lWebHook, lMotDFormat, aBestMsg.MessageIDAttachmentList, aBestMsg.ChannelID);
 
          //record date posted
         _dbh.SetLastMotdDate(DateTime.UtcNow.Date, lSourceChannel.GuildId!.Value);                        

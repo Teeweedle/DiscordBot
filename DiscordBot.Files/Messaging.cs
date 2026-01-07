@@ -1,4 +1,5 @@
 using System.Text;
+using Cohere;
 using DSharpPlus;
 using DSharpPlus.Entities;
 
@@ -30,7 +31,7 @@ public class Messaging
     {
         string lUserName = $"\nOn this day in {aBestMsg.Timestamp.Year}";
         string lContent = $"------------------------------------------------\n" 
-                + $"<@{aBestMsg.AuthorID}> said:"
+                + $"<@{aBestMsg.AuthorID}> said:\n"
                 + $"{aBestMsg.Content}";
         string lFooter = $"------------------------------------------------\n" 
                 + $"[view orignal message]({aMsg.JumpLink})";
@@ -54,17 +55,35 @@ public class Messaging
     /// <param name="aBestMsg">Best message with grouped content</param>
     /// <param name="aChannelID"></param>
     /// <returns></returns>
-    public async Task SendWebhookMessageAsync(
+    public async Task SendWebhookMessageAsync(//Change to pass a list of DiscordMessages to have access to attachments
                         DiscordWebhook aWebhook,
                         (string userName, string content, string? footer) aFormat,
-                        List<string> aUrlList)    
-    {
+                        List<string> aMessageIDAttchmentList,
+                        string aChannelID)    
+    {        
         var lBot = await _discord.GetUserAsync(BotID);
         var lWebHookBuilder = new DiscordWebhookBuilder()
             .WithUsername(aFormat.userName)
-            .WithContent(BuildContent(aFormat.content, aUrlList))
+            .WithContent(aFormat.content)//BuildContent(aFormat.content, aUrlList) 
             .WithAvatarUrl(lBot.AvatarUrl); 
-        
+
+        DiscordChannel lChannel = await _discord.GetChannelAsync(ulong.Parse(aChannelID));
+        foreach (var id in aMessageIDAttchmentList)
+        {
+            DiscordMessage lMessage = await lChannel.GetMessageAsync(ulong.Parse(id));
+            foreach (var attachment in lMessage.Attachments)
+            {
+                try
+                {
+                    var lStream = await _httpClient.GetStreamAsync(attachment.ProxyUrl);
+                    lWebHookBuilder.AddFile(attachment.FileName, lStream);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Failed to attach file {attachment.FileName}: {ex.Message}");
+                }
+            }
+        }
         await aWebhook.ExecuteAsync(lWebHookBuilder);
 
         if (!string.IsNullOrEmpty(aFormat.footer))
@@ -76,14 +95,38 @@ public class Messaging
             await aWebhook.ExecuteAsync(lFooterBuilder);
         }
     }
+    public async Task SendWebhookMessageAsync(
+                        DiscordWebhook webhook,
+                        (string userName, string content, string? footer) format)
+    {
+        var bot = await _discord.GetUserAsync(BotID);
+
+        var builder = new DiscordWebhookBuilder()
+            .WithUsername(format.userName)
+            .WithContent(format.content)
+            .WithAvatarUrl(bot.AvatarUrl);
+
+        await webhook.ExecuteAsync(builder);
+
+        if (!string.IsNullOrEmpty(format.footer))
+        {
+            var footerBuilder = new DiscordWebhookBuilder()
+                .WithUsername(format.userName)
+                .WithContent(format.footer)
+                .WithAvatarUrl(bot.AvatarUrl);
+
+            await webhook.ExecuteAsync(footerBuilder);
+        }
+    }
+
     public string BuildContent(string aContent, List<string> aUrlList)
     {
         StringBuilder lContent = new StringBuilder(aContent);
-
+        lContent.Append(" ");
         foreach (var url in aUrlList)
-            lContent.Append("\n").Append(url);
+            lContent.Append(url);
 
-        return lContent.ToString().TrimEnd();
+        return lContent.ToString();
     }
     public async Task SendChannelMessageAsync(string aMessage, ulong aChannelID)
     {

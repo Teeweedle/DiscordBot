@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using DSharpPlus;
 using DSharpPlus.Entities;
 using DSharpPlus.SlashCommands;
@@ -153,6 +154,9 @@ public class MyCommands : ApplicationCommandModule
             // var lStopWatch = Stopwatch.StartNew();
             await _messagingService.PostMotDAsync(lMotd, lChannelID);
             // lStopWatch.Stop();
+            // var elapsed = lStopWatch.Elapsed; 
+            // await ctx.EditResponseAsync( 
+            //     new DiscordWebhookBuilder().WithContent($"Done in {elapsed.TotalMilliseconds:N0} ms"));
             await ctx.DeleteResponseAsync();
         }
         catch (Exception ex)

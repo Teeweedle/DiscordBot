@@ -97,7 +97,7 @@ public sealed class MotdService //: IMotdPostingService
         {
             Content = lFirstMessage.Content,
             AttachmentCount = lFirstMessage.AttachmentCount,
-            AttachmentUrlList = new List<string>(lFirstMessage.AttachmentUrlList),
+            MessageIDAttachmentList = new List<string>(lFirstMessage.MessageIDAttachmentList),
             ReactionCount = lFirstMessage.ReactionCount,
             Timestamp = lFirstMessage.Timestamp,
             MessageID = lFirstMessage.MessageID,
@@ -106,14 +106,19 @@ public sealed class MotdService //: IMotdPostingService
             AuthorID = lFirstMessage.AuthorID,
             Interestingness = lFirstMessage.Interestingness
         };
+
+        if(lFirstMessage.AttachmentCount > 0)
+            lNewMessage.MessageIDAttachmentList.Add(lFirstMessage.MessageID);
+            
         for(int i = 1; i < aMessages.Count; i++)
         {            
             lNewMessage.Content += "\n" + aMessages[i].Content;
+
+            if(aMessages[i].AttachmentCount > 0)
+                lNewMessage.MessageIDAttachmentList.Add(aMessages[i].MessageID);
+
             lNewMessage.AttachmentCount += aMessages[i].AttachmentCount;
             lNewMessage.ReactionCount += aMessages[i].ReactionCount;
-
-            foreach(string url in aMessages[i].AttachmentUrlList) 
-                lNewMessage.AttachmentUrlList.Add(url);
         }        
         return lNewMessage;
     }
