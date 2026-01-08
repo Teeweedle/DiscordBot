@@ -95,16 +95,14 @@ public class MessagingService : IReminderNotifier
             lWebHook.Token!);
         return await _discord.GetWebhookWithTokenAsync(lWebHook.Id, lWebHook.Token!);
     }
-    public async Task SendEmptyMotdResponseAsync()
+    public async Task SendMissingMotdChannelAsync(ulong aGuildID)
     {
-        // await _messaging.SendChannelMessageAsync("Today is a slow day in history. No messages were found for today.", 
-        //                                         ulong.Parse(_dbh.GetMotdChannelID() ?? string.Empty));;
+        await _messaging.SendDMToOwnerAsync("The MOTD channel has not been set. Please use `/setmotdchannel` to set it.", aGuildID);
     }
-    public async Task SendMissingMotdChannelAsync()
+    public Task SendNoMotdFoundAsync(ulong aChannelID)
     {
-        //TODO: Change to DM
-        // await _messaging.SendChannelMessageAsync("The MOTD channel has not been set. Please use `/setmotdchannel` to set it.", 
-        //                                         ulong.Parse(_dbh.GetMotdChannelID() ?? string.Empty));
+        return _messaging.SendChannelMessageAsync("Today is a slow day in history. No messages were found for today.",
+                                                 aChannelID);
     }
     public Task SendReminderAsync(ReminderRecord aReminderRecord)
     {

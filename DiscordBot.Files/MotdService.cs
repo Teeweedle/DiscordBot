@@ -1,4 +1,4 @@
-public sealed class MotdService //: IMotdPostingService
+public sealed class MotdService : IMotdPostingService
 {
     private readonly DatabaseHelper _dbh;
     private readonly DiscordLookupService _lookup;
@@ -127,9 +127,10 @@ public sealed class MotdService //: IMotdPostingService
     /// </summary>
     /// <param name="aDateUTC">The date to check for the MOTD.</param>
     /// <returns>True if a MOTD has been posted within the last 24 hours, false otherwise.</returns>
-    public async Task<bool> HasMotdBeenPostedAsync(DateTime aDateUTC, string aGuildID)
+    public async Task<bool> HasMotdBeenPostedAsync(DateTime aDateUTC, ulong aGuildID)
     {
-        string? lMotdChannelIDString = _dbh.GetMotdChannelID(aGuildID);
+        string lGuildID = aGuildID.ToString();
+        string? lMotdChannelIDString = _dbh.GetMotdChannelID(lGuildID);
         if(string.IsNullOrEmpty(lMotdChannelIDString)) 
             return false;
 
@@ -138,6 +139,19 @@ public sealed class MotdService //: IMotdPostingService
 
         return DateTime.UtcNow - lLastMotdDate <= TimeSpan.FromDays(1);
     }
-    // public async Task<DateTime> GetLastMotDDate() => await _lookup.GetLastMOTDDateAsync(ulong.Parse(_dbh.GetMotdChannelID() ?? string.Empty));
-    // public async Task<ulong> GetMotdChannelID() => ulong.Parse(_dbh.GetMotdChannelID() ?? string.Empty);
+    public async Task<DateTime> GetLastMotDDate(ulong aGuildID) {
+        string lGuildID = aGuildID.ToString();
+        return await _lookup.GetLastMOTDDateAsync(ulong.Parse(_dbh.GetMotdChannelID(lGuildID) ?? string.Empty));
+    } 
+                                
+    public async Task<ulong> GetMotdChannelID(ulong aGuildID){
+        string lGuildID = aGuildID.ToString();
+        return ulong.Parse(_dbh.GetMotdChannelID(lGuildID) ?? string.Empty);
+        
+    }
+    public async Task SetLastMotDDate(DateTime aDateUTC, ulong aGuildID) {
+        string lGuildID = aGuildID.ToString();
+        _dbh.SetLastMotdDate(aDateUTC, ulong.Parse(_dbh.GetMotdChannelID(lGuildID) ?? string.Empty));
+    } 
+    public async Task<List<ulong>> GetGuildsDueForMotdPostingAsync(DateTime aToday) => _dbh.GetGuildsDueForMotdPosting(aToday);
 }

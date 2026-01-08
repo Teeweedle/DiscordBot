@@ -15,7 +15,7 @@ public class Messaging
         _discord = aDiscord;
         _httpClient = aHttpClient;
     }     
-    public async Task SendDMToUserAsync(ReminderRecord aReminder) 
+    public async Task SendReminderToUserAsync(ReminderRecord aReminder) 
     {
         DiscordGuild lGuild = await _discord.GetGuildAsync(aReminder.GuildID);
         
@@ -23,9 +23,12 @@ public class Messaging
 
         await lMember.SendMessageAsync(aReminder.Message);
     }
-    public async Task SendDMToOwnerAsync(string aMessage) 
+    public async Task SendDMToOwnerAsync(string aMessage, ulong aGuildID) 
     {
-        DiscordGuild lGuild = await _discord.GetGuildAsync(ulong.Parse("1428047784245854310"));
+        DiscordGuild lGuild = await _discord.GetGuildAsync(aGuildID);
+        ulong lOwnerId =  lGuild.OwnerId;
+        DiscordMember lOwner = await lGuild.GetMemberAsync(lOwnerId);
+        await lOwner.SendMessageAsync(aMessage);  
     } 
     public (string, string, string?) MotDFormatter(DiscordMessage aMsg, MessageRecord aBestMsg)
     {
@@ -55,7 +58,7 @@ public class Messaging
     /// <param name="aBestMsg">Best message with grouped content</param>
     /// <param name="aChannelID"></param>
     /// <returns></returns>
-    public async Task SendWebhookMessageAsync(//Change to pass a list of DiscordMessages to have access to attachments
+    public async Task SendWebhookMessageAsync(
                         DiscordWebhook aWebhook,
                         (string userName, string content, string? footer) aFormat,
                         List<string> aMessageIDAttchmentList,

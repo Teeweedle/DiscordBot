@@ -645,4 +645,26 @@ public class DatabaseHelper
 
         return (lFullyScraped, lLastMessageID);
     }
+    public List<ulong> GetGuildsDueForMotdPosting(DateTime aToday) 
+    {
+        List<ulong> lGuilds = new List<ulong>();
+
+        using var lConnection = new SqliteConnection(_motdSettingsConnectionString);
+        lConnection.Open();
+
+        string lSql = @"
+            SELECT GuildID
+            FROM MotdSettings
+            WHERE date(LastMotdDate) < date($Date)";
+
+        using var lCmd = new SqliteCommand(lSql, lConnection);
+
+        lCmd.Parameters.AddWithValue("$Date", aToday.ToString("yyyy-MM-dd"));
+        using var lReader = lCmd.ExecuteReader();
+
+        while(lReader.Read())
+            lGuilds.Add(ulong.Parse(lReader.GetString(0)));
+
+        return lGuilds;        
+    }
 }

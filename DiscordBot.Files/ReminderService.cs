@@ -69,7 +69,7 @@ public class ReminderService : IReminderService
                                             .ToList();
         foreach (var lReminder in lExpiredReminders)
         {
-            await _messaging.SendDMToUserAsync(lReminder);
+            await _messaging.SendReminderToUserAsync(lReminder);
             DeleteReminder(lReminder);
         }
     }    

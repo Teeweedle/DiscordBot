@@ -7,7 +7,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 public class MyCommands : ApplicationCommandModule
 {   
-    private readonly Messaging _messaging;
     private readonly MessagingService _messagingService;
     private readonly IReminderService _reminderService;
     private readonly MotdService _motdService;
@@ -20,7 +19,6 @@ public class MyCommands : ApplicationCommandModule
                     ChannelSummaryService aChannelSummaryService,
                     BotInfoService aBotInfoService)
     {
-        _messaging = aMessaging;
         _messagingService = aMessagingService;
         _reminderService = aReminderService;
         _motdService = aMotdService;
@@ -145,8 +143,7 @@ public class MyCommands : ApplicationCommandModule
 
         if(lMotd == null)
         {
-            await _messaging.SendChannelMessageAsync("Today is a slow day in history. No messages were found for today.",
-                        lChannelID);        
+            await _messagingService.SendNoMotdFoundAsync(lChannelID);        
             return;
         }
         try
