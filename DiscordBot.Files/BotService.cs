@@ -1,6 +1,7 @@
 using DSharpPlus;
 using DSharpPlus.SlashCommands;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 public class BotService : BackgroundService
 {
@@ -8,25 +9,25 @@ public class BotService : BackgroundService
     private readonly IServiceProvider _services;
     private readonly IChannelScraper _channelScraper;
     private static ulong _guildID = 429063504725671947;
+    private readonly ILogger<BotService> _logger;
 
     public BotService(DiscordClient aDiscord, 
                     IServiceProvider aServices, 
-                    IChannelScraper aChannelScraper)
+                    IChannelScraper aChannelScraper,
+                    ILogger<BotService> aLogger)
     {        
         _discord = aDiscord;
         _services = aServices;
+        _logger = aLogger;
         //start the channel scraper
         _channelScraper = aChannelScraper;
     }
     protected override async Task ExecuteAsync(CancellationToken aStoppingToken)
     {              
-        Console.WriteLine($"Today is: {DateOnly.FromDateTime(DateTime.Now)}");
-
         RegisterCommands();
         
         await _discord.ConnectAsync();
 
-        Console.WriteLine($"Guild count after connect: {_discord.Guilds.Count}");
         // await DeleteCommands();  //for testing
         // Keep the program running
         await Task.Delay(-1, aStoppingToken);
@@ -39,7 +40,7 @@ public class BotService : BackgroundService
         });
         slash.SlashCommandErrored += (s, e) =>
         {
-            Console.WriteLine($"Error: {e.Exception.Message}");
+            _logger.LogError(e.Exception, "Slash command errored");
             return Task.CompletedTask;
         };
         slash.RegisterCommands<MyCommands>();

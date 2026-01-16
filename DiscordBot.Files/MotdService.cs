@@ -1,11 +1,20 @@
+using Microsoft.Extensions.Logging;
+
 public sealed class MotdService : IMotdPostingService
 {
     private readonly DatabaseHelper _dbh;
     private readonly DiscordLookupService _lookup;
-    public MotdService(DatabaseHelper aDb, DiscordLookupService aLookup)
+    private readonly MessagingService _messaging;
+    private readonly ILogger<MotdService> _logger;
+    public MotdService(DatabaseHelper aDb, 
+                        DiscordLookupService aLookup, 
+                        MessagingService aMessagingService, 
+                        ILogger<MotdService> aLogger)
     {
         _dbh = aDb;
         _lookup = aLookup;
+        _messaging = aMessagingService;
+        _logger = aLogger;
     }
     /// <summary>
     /// Returns the MessageRecord with the highest interestingness
@@ -16,12 +25,12 @@ public sealed class MotdService : IMotdPostingService
         
         var lMOTD = new OnThisDay(aMessages);
         lMOTD.GenerateInterestingness(aWeightedChannelID);
-        Console.WriteLine($"Posting MOTD... ");   
+        _logger.LogInformation($"Posting MOTD..."); 
 
         var lBestMsg = aMessages
             .OrderByDescending(m => m.Interestingness)
             .FirstOrDefault();
-        Console.WriteLine($"Best Interestingness message - {lBestMsg!.Interestingness} \n" +
+        _logger.LogInformation($"Best Interestingness message - {lBestMsg!.Interestingness} \n" +
                             $"The message is - {lBestMsg.Content}\n" +
                             $"The attachment count is - {lBestMsg.AttachmentCount}");
         return lBestMsg;
@@ -135,23 +144,34 @@ public sealed class MotdService : IMotdPostingService
             return false;
 
         ulong lMotdChannelID = ulong.Parse(lMotdChannelIDString);
-        DateTime lLastMotdDate = await _lookup.GetLastMOTDDateAsync(lMotdChannelID); 
+        DateTime lLastMotdDate = await _lookup.GetLastMotdDateAsync(lMotdChannelID); 
 
         return DateTime.UtcNow - lLastMotdDate <= TimeSpan.FromDays(1);
     }
     public async Task<DateTime> GetLastMotDDate(ulong aGuildID) {
         string lGuildID = aGuildID.ToString();
-        return await _lookup.GetLastMOTDDateAsync(ulong.Parse(_dbh.GetMotdChannelID(lGuildID) ?? string.Empty));
+        return await _lookup.GetLastMotdDateAsync(ulong.Parse(_dbh.GetMotdChannelID(lGuildID) ?? string.Empty));
     } 
                                 
     public async Task<ulong> GetMotdChannelID(ulong aGuildID){
         string lGuildID = aGuildID.ToString();
-        return ulong.Parse(_dbh.GetMotdChannelID(lGuildID) ?? string.Empty);
+        if(!ulong.TryParse(_dbh.GetMotdChannelID(lGuildID), out var lChannelID))
+            return 0;
+        return lChannelID;
         
     }
-    public async Task SetLastMotDDate(DateTime aDateUTC, ulong aGuildID) {
-        string lGuildID = aGuildID.ToString();
-        _dbh.SetLastMotdDate(aDateUTC, ulong.Parse(_dbh.GetMotdChannelID(lGuildID) ?? string.Empty));
-    } 
+    public async Task SendMotdAsync(MessageRecord aMessageRecord, ulong aChannelID)
+    {
+        await _messaging.PostMotdAsync(aMessageRecord, aChannelID); 
+        
+        await SetLastMotdDate(DateTime.UtcNow, ulong.Parse(aMessageRecord.GuildID.ToString())); 
+    }
+    public async Task SetLastMotdDate(DateTime aEstDate, ulong aGuildID)
+    {
+        var lEstZone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time"); //TODO: Move this to a config file and make it configurable.       
+        var lEstDate = TimeZoneInfo.ConvertTimeFromUtc(aEstDate, lEstZone).Date;
+
+        _dbh.SetLastMotdDate(lEstDate, aGuildID);    
+    }
     public async Task<List<ulong>> GetGuildsDueForMotdPostingAsync(DateTime aToday) => _dbh.GetGuildsDueForMotdPosting(aToday);
 }

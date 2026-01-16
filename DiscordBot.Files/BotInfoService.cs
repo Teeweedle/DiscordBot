@@ -1,4 +1,3 @@
-using System.ComponentModel;
 
 public sealed class BotInfoService
 {
@@ -26,7 +25,7 @@ public sealed class BotInfoService
             WeightedChannel = await ResolveChannelName(lWeightedChannelID),
             TargetUser = await ResolveUserName(lTargetUserID),
             TargetChannel = await ResolveChannelName(lTargetChannelID),
-            HasMotdBeenPosted = await _motdService.HasMotdBeenPostedAsync(DateTime.UtcNow.Date, aGuildID)
+            HasMotdBeenPosted = await _motdService.HasMotdBeenPostedAsync(DateTime.UtcNow.Date, ulong.Parse(aGuildID))
         };
     }
     private async Task<string?> ResolveChannelName(string? aID)

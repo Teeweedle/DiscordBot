@@ -8,8 +8,6 @@ class Program
 {    
     public static async Task Main(string[] args)
     {
-        Console.WriteLine("Bot is starting... ");
-
         var lHost = CreateHostBuilder(args).Build();
 
         await lHost.RunAsync();
@@ -48,10 +46,9 @@ class Program
                 services.AddSingleton<HttpClient>();
                 services.AddSingleton<CohereClient>(provider =>
                 {
-                    var config = provider.GetRequiredService<IConfiguration>();
-                    var apiKey = config["COHERE_API_KEY"] ?? throw new Exception("COHERE_API_KEY is not set");
-
-                    return new CohereClient(apiKey);
+                    var apiKey = Environment.GetEnvironmentVariable("COHERE_API_KEY") ?? throw new Exception("COHERE_API_KEY is not set");
+                    var logger = provider.GetRequiredService<ILogger<CohereClient>>();
+                    return new CohereClient(apiKey, logger);
                 });
                 services.AddSingleton<MessagingService>();
                 services.AddSingleton<Messaging>();
@@ -65,9 +62,10 @@ class Program
                 services.AddSingleton<IReminderNotifier, MessagingService>();
                 services.AddSingleton<IReminderService, ReminderService>();
                 services.AddSingleton<IChannelScraper, ChannelScraper>();
+                services.AddSingleton<IMotdPostingService, MotdService>();
 
                 services.AddHostedService<ReminderChecker>();
-                // services.AddHostedService<MotdPoster>();
+                services.AddHostedService<MotdPoster>();
                 services.AddHostedService<BotService>();
             });
 }

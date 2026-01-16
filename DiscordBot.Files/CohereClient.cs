@@ -2,17 +2,20 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.Extensions.Logging;
 
 public class CohereClient
 {
     private readonly HttpClient _http;
+    private readonly ILogger<CohereClient> _logger;
 
-    public CohereClient(string apiKey)
+    public CohereClient(string apiKey, ILogger<CohereClient> aLogger)
     {
         _http = new HttpClient();
         _http.BaseAddress = new Uri("https://api.cohere.ai/v1/");
         _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
         _http.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        _logger = aLogger;
     }
 
     /// <summary>
@@ -41,19 +44,16 @@ public class CohereClient
 
             if (!lResponse.IsSuccessStatusCode)
             {
-                Console.WriteLine("Cohere API Request Failed:");
-                Console.WriteLine(body);
+                _logger.LogError(body, "Cohere API Request Failed:");
                 return string.Empty;
             }
-            Console.WriteLine(body);
             var chatResponse = JsonSerializer.Deserialize<CohereChatResponse>(body);
 
             return chatResponse?.Text ?? string.Empty;
         }
         catch (Exception ex)
         {
-            Console.WriteLine("Cohere API error:");
-            Console.WriteLine(ex.Message);
+            _logger.LogError(ex, "Cohere API error:");
             return string.Empty;
         }
     }

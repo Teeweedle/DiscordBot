@@ -1,11 +1,11 @@
 using System.Globalization;
-using System.Text.Json;
 using DSharpPlus.Entities;
 using Microsoft.Data.Sqlite;
 public class DatabaseHelper
 {
     private static readonly string _folderPath = Path.GetFullPath(
-                                                    Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "data"));
+                                                    Environment.GetEnvironmentVariable("DATABASE_PATH") 
+                                                    ?? Path.Combine(AppContext.BaseDirectory, "data"));
     private static readonly string _messagesDBPath = Path.Combine(_folderPath, "Messages.db");
     private static readonly string _webhookInfoDBPath = Path.Combine(_folderPath, "WebhookInfo.db");
     private static readonly string _targetUserAndChannelDBPath = Path.Combine(_folderPath, "TargetUserAndChannel.db");
@@ -153,7 +153,7 @@ public class DatabaseHelper
                                 FROM Messages
                                 WHERE strftime('%m', Timestamp) = $Month
                                     AND strftime('%d', Timestamp) = $Day
-                                    And strftime('%Y', Timestamp) != $CurrentYear
+                                    AND strftime('%Y', Timestamp) != $CurrentYear
                                 ORDER BY Random()";
             lCmd.Parameters.AddWithValue("$Month", aCurrentDate.Month.ToString("D2"));
             lCmd.Parameters.AddWithValue("$Day", aCurrentDate.Day.ToString("D2"));

@@ -1,19 +1,19 @@
-using System.Text;
-using Cohere;
 using DSharpPlus;
 using DSharpPlus.Entities;
+using Microsoft.Extensions.Logging;
 
 public class Messaging
 {
     private readonly DiscordClient _discord;
     private readonly HttpClient _httpClient;
-    private readonly ulong BotID = 1428047784245854310;
-
+    private readonly ILogger<Messaging> _logger;
     public Messaging(DiscordClient aDiscord, 
-                    HttpClient aHttpClient)
+                    HttpClient aHttpClient,
+                    ILogger<Messaging> aLogger)
     {
         _discord = aDiscord;
         _httpClient = aHttpClient;
+        _logger = aLogger;
     }     
     public async Task SendReminderToUserAsync(ReminderRecord aReminder) 
     {
@@ -31,7 +31,8 @@ public class Messaging
         await lOwner.SendMessageAsync(aMessage);  
     } 
     public (string, string, string?) MotDFormatter(DiscordMessage aMsg, MessageRecord aBestMsg)
-    {
+    {   
+        //TODO: Can't handle polls, upgrade DSharpPlus to 5.x
         string lUserName = $"\nOn this day in {aBestMsg.Timestamp.Year}";
         string lContent = $"------------------------------------------------\n" 
                 + $"<@{aBestMsg.AuthorID}> said:\n"
@@ -64,12 +65,12 @@ public class Messaging
                         List<string> aMessageIDAttchmentList,
                         string aChannelID)    
     {        
-        var lBot = await _discord.GetUserAsync(BotID);
+        var lBot = _discord.CurrentUser;
         var lWebHookBuilder = new DiscordWebhookBuilder()
             .WithUsername(aFormat.userName)
-            .WithContent(aFormat.content)//BuildContent(aFormat.content, aUrlList) 
+            .WithContent(aFormat.content)
             .WithAvatarUrl(lBot.AvatarUrl); 
-
+        int lFileIndex = 0;
         DiscordChannel lChannel = await _discord.GetChannelAsync(ulong.Parse(aChannelID));
         foreach (var id in aMessageIDAttchmentList)
         {
@@ -79,11 +80,14 @@ public class Messaging
                 try
                 {
                     var lStream = await _httpClient.GetStreamAsync(attachment.ProxyUrl);
-                    lWebHookBuilder.AddFile(attachment.FileName, lStream);
+
+                    var lExtension = Path.GetExtension(attachment.FileName);
+                    var lUniqueFileName = $"{id}_{lFileIndex++}{lExtension}";
+                    lWebHookBuilder.AddFile(lUniqueFileName, lStream);
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Failed to attach file {attachment.FileName}: {ex.Message}");
+                    _logger.LogError(ex, "Failed to attach file {FileName} to channel {ChannelID}", attachment.FileName, lChannel.Id);
                 }
             }
         }
@@ -102,7 +106,7 @@ public class Messaging
                         DiscordWebhook webhook,
                         (string userName, string content, string? footer) format)
     {
-        var bot = await _discord.GetUserAsync(BotID);
+        var bot = _discord.CurrentUser;
 
         var builder = new DiscordWebhookBuilder()
             .WithUsername(format.userName)
@@ -122,15 +126,6 @@ public class Messaging
         }
     }
 
-    public string BuildContent(string aContent, List<string> aUrlList)
-    {
-        StringBuilder lContent = new StringBuilder(aContent);
-        lContent.Append(" ");
-        foreach (var url in aUrlList)
-            lContent.Append(url);
-
-        return lContent.ToString();
-    }
     public async Task SendChannelMessageAsync(string aMessage, ulong aChannelID)
     {
         var lmsgBuilder = new DiscordMessageBuilder();

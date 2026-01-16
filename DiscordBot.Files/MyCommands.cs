@@ -12,8 +12,7 @@ public class MyCommands : ApplicationCommandModule
     private readonly MotdService _motdService;
     private readonly ChannelSummaryService _channelSummaryService;
     private readonly BotInfoService _botInfoService;
-    public MyCommands(Messaging aMessaging, 
-                    MessagingService aMessagingService,
+    public MyCommands(MessagingService aMessagingService,
                     IReminderService aReminderService, 
                     MotdService aMotdService, 
                     ChannelSummaryService aChannelSummaryService,
@@ -149,7 +148,7 @@ public class MyCommands : ApplicationCommandModule
         try
         {
             // var lStopWatch = Stopwatch.StartNew();
-            await _messagingService.PostMotDAsync(lMotd, lChannelID);
+            await _motdService.SendMotdAsync(lMotd, lChannelID);
             // lStopWatch.Stop();
             // var elapsed = lStopWatch.Elapsed; 
             // await ctx.EditResponseAsync( 

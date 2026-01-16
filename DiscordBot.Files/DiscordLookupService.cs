@@ -20,7 +20,7 @@ public sealed class DiscordLookupService
         DiscordUser lUser = await _discord.GetUserAsync(aUserID);
         return lUser.Username;
     }
-    public async Task<DateTime> GetLastMOTDDateAsync(ulong aMOTDChannelID)
+    public async Task<DateTime> GetLastMotdDateAsync(ulong aMOTDChannelID)
     {
         DiscordChannel lChannel = await _discord.GetChannelAsync(aMOTDChannelID);
         

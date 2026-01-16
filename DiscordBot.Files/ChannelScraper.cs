@@ -1,8 +1,7 @@
-using System.Runtime.CompilerServices;
 using DSharpPlus;
 using DSharpPlus.Entities;
 using DSharpPlus.EventArgs;
-using Microsoft.VisualBasic;
+using Microsoft.Extensions.Logging;
 
 public class ChannelScraper : IChannelScraper
 {
@@ -12,23 +11,27 @@ public class ChannelScraper : IChannelScraper
     private Dictionary<ulong, bool> _fullyScraped = new();
     private Dictionary<ulong, string?> _lastMsgID = new();
     private static readonly int ScrapeDelay = 5;
+    private readonly ILogger<ChannelScraper> _logger;
 
-    public ChannelScraper(DiscordClient aDiscord, DatabaseHelper aDb)
+    public ChannelScraper(DiscordClient aDiscord, 
+                            DatabaseHelper aDb,
+                            ILogger<ChannelScraper> aLogger)
     {
         _discord = aDiscord;
         _dbh = aDb;
+        _logger = aLogger;
         _discord.GuildDownloadCompleted += OnGuildDownloadCompleted;    
     }
     private async Task OnGuildDownloadCompleted(DiscordClient sender, GuildDownloadCompletedEventArgs e)
     {
         try
         {
-            Console.WriteLine("Bot is connected and ready.");
+            _logger.LogInformation("Bot is connected and ready.");
             await ScrapeAllGuilds(_discord);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[Scrape Error] {ex.GetType().Name}: {ex.Message}");
+            _logger.LogError(ex, "Error in OnGuildDownloadCompleted");
             throw;
         }
     }
@@ -36,8 +39,9 @@ public class ChannelScraper : IChannelScraper
     {
         foreach (var guild in aDiscord.Guilds.Values)
         {
-            Console.WriteLine($"Channel Count: {guild.Channels.Count}");
-            Console.WriteLine($"{guild.Name}");
+            _logger.LogInformation($"Guild Count: {aDiscord.Guilds.Count}");
+            _logger.LogInformation($"Scraping {guild.Name}...");
+
             foreach (var channel in guild.Channels.Values)
             {
                 if(channel.Type != ChannelType.Text)
@@ -57,8 +61,14 @@ public class ChannelScraper : IChannelScraper
     private async Task ScrapeChannelAsync(DiscordChannel aChannel)
     {
         try
-        {
-            Console.WriteLine($"Scraping #{aChannel.Name} in {aChannel.Guild.Name}...");
+        {   
+            var lbotMember = await aChannel.Guild.GetMemberAsync(_discord.CurrentUser.Id);
+            var lChannelPermissions = aChannel.PermissionsFor(lbotMember);
+            if(!lChannelPermissions.HasPermission(Permissions.ReadMessageHistory) || !lChannelPermissions.HasPermission(Permissions.AccessChannels))
+            {
+                _logger.LogDebug($"Bot does not have permission to scrape #{aChannel.Name} in {aChannel.Guild.Name}...");
+                 return;
+            }   
             if (!_fullyScraped[aChannel.Id])
             {
                 await FullScrapeChannelAsync(aChannel);
@@ -68,9 +78,15 @@ public class ChannelScraper : IChannelScraper
                 await TailScrapeChannelAsync(aChannel);
             }
         }
+        catch(DSharpPlus.Exceptions.UnauthorizedException ex)
+        {
+            _logger.LogDebug("UnauthorizedException in ScrapeChannelAsync{ChannelID} in guild {GuildID}", 
+                            aChannel.Id, aChannel.Guild.Id);
+            return;
+        }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error in ScrapeChannelAsync: {aChannel.Name}: {ex.Message}");
+            _logger.LogError(ex, "Error in ScrapeChannelAsync");
         }
     }
     private async Task ScrapeLoopAsync(DiscordChannel aChannel)
@@ -142,9 +158,5 @@ public class ChannelScraper : IChannelScraper
     private void SaveMessage(DiscordMessage aMessage)
     {
         _dbh.SaveMessage(aMessage);
-    }
-    private void LoadLastScanned()
-    {
-        _lastChannelSrape = _dbh.GetLastScanned();
     }
 }
