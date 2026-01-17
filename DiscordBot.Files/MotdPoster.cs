@@ -16,6 +16,7 @@ public class MotdPoster : BackgroundService
     }
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        _logger.LogInformation("MotdPoster is starting at {DateTime}", DateTime.UtcNow);
         while (!stoppingToken.IsCancellationRequested)
         {
             try
@@ -27,6 +28,7 @@ public class MotdPoster : BackgroundService
                     lNextRun = lNextRun.AddDays(1);
     
                 TimeSpan lInterval = lNextRun - lNow;
+                _logger.LogInformation("MotdPoster is sleeping for {Interval}", lInterval);
                 await Task.Delay(lInterval, stoppingToken);
     
                 DateTime lToday = DateTime.UtcNow.Date;
@@ -58,7 +60,7 @@ public class MotdPoster : BackgroundService
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, "Error posting MOTD for guild {GuildID}. Continue with next guild", guildID);
-                        throw;
+                        continue;
                     }                  
                 }
             }
