@@ -9,6 +9,7 @@ public class MyCommands : ApplicationCommandModule
 {   
     private readonly MessagingService _messagingService;
     private readonly IReminderService _reminderService;
+    private readonly IFeatureGateService _featureGateService;
     private readonly MotdService _motdService;
     private readonly ChannelSummaryService _channelSummaryService;
     private readonly BotInfoService _botInfoService;
@@ -16,13 +17,15 @@ public class MyCommands : ApplicationCommandModule
                     IReminderService aReminderService, 
                     MotdService aMotdService, 
                     ChannelSummaryService aChannelSummaryService,
-                    BotInfoService aBotInfoService)
+                    BotInfoService aBotInfoService,
+                    IFeatureGateService aFeatureGateService)
     {
         _messagingService = aMessagingService;
         _reminderService = aReminderService;
         _motdService = aMotdService;
         _channelSummaryService = aChannelSummaryService;
         _botInfoService = aBotInfoService;
+        _featureGateService = aFeatureGateService;
     } 
     [SlashCommand("SetMotDChannel", "Sets the channel to send MotD to. Requires admin permissions.")]
     [SlashCommandPermissions(Permissions.Administrator)]
@@ -85,7 +88,9 @@ public class MyCommands : ApplicationCommandModule
             InteractionResponseType.DeferredChannelMessageWithSource,
             new DiscordInteractionResponseBuilder().AsEphemeral(true)
         );
-
+        if(!await _featureGateService.EnsureFeatureEnabledAsync(ctx, "AI"))
+            return;
+        
         string lSummary = await _channelSummaryService.GetChannelSummaryAsync(ctx.Channel.Id);
 
         await ctx.EditResponseAsync(new DiscordWebhookBuilder()
@@ -93,7 +98,7 @@ public class MyCommands : ApplicationCommandModule
                 .WithTitle($"TLDR for #{ctx.Channel.Name}")
                 .WithDescription(lSummary)
                 .WithColor(DiscordColor.Green))
-            );
+            );       
     }
       
     [SlashCommand("SetTarget", "he bot will respond to this user. Requires admin permissions.")]
@@ -101,7 +106,10 @@ public class MyCommands : ApplicationCommandModule
     public async Task SetTargetCommand(InteractionContext ctx, 
                             [Option("user", "User to set")] DiscordUser aUser, 
                             [Option("channel", "Channel to set")] DiscordChannel aChannel)
-    {        
+    {
+        if(!await _featureGateService.EnsureFeatureEnabledAsync(ctx, "AI"))
+            return;
+
         if (!ctx.Member.Permissions.HasPermission(Permissions.Administrator))
         {
             await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
@@ -206,12 +214,11 @@ public class MyCommands : ApplicationCommandModule
                 .WithDescription("### ⚙️ Setup Commands\n" +
                                 "• `/setmotdchannel` - Sets the channel to send MotD to\n" +
                                 "• `/setmotdweightedchannel` - Sets the weighted channel messages in this channel are more likely to be picked\n" +
-                                "• `/settargetuser` - The bot will respond to this user\n" +
-                                "• `/settargetchannel` - The bot will respond to the chosen user in this channel\n" +
+                                "• `/settarget` - The bot will respond to this user in the specified channel 💲💲💲\n" +
                                 "### 🛠️ General Commands\n" +
                                 "• `/postmotd` - Posts the MotD for today in the channel you use this command in\n" +
                                 "• `/remindme` - Sets a custom reminder for you to be reminded of something in the future\n" +
-                                "• `/tldr` - Get a summary of the past 24 hours in the current channel\n" +
+                                "• `/tldr` - Get a summary of the past 24 hours in the current channel 💲💲💲\n" +
                                 "• `/info` - Get info on commands and channels for this bot")
                 .AddField("📢 **MotD Channel**", 
                     lInfo.MotdChannel is null ? "❌ *Not Set*" : $"# {lInfo.MotdChannel}", inline: true)

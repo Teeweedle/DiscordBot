@@ -12,17 +12,21 @@ public class DatabaseHelper
     private static readonly string _remindMeDBPath = Path.Combine(_folderPath, "RemindMe.db");
     private static readonly string _motdSettingsDBPath = Path.Combine(_folderPath, "MotdSettings.db");
     private static readonly string _channelScrapInfoDBPath = Path.Combine(_folderPath, "ChannelScrapeInfo.db");
+    private static readonly string _enabledFeaturesDBPath = Path.Combine(_folderPath, "EnabledFeatures.db");
     private readonly string _messagesConnectionString = $"Data Source={_messagesDBPath}";
     private string _webhookInfoConnectionString = $"Data Source={_webhookInfoDBPath}";
     private string _targetUserAndChannelConnectionString = $"Data Source={_targetUserAndChannelDBPath}";
     private string _remindMeConnectionString = $"Data Source={_remindMeDBPath}";
     private string _motdSettingsConnectionString = $"Data Source={_motdSettingsDBPath}";
     private string _channelScrapeInfoConnectionString = $"Data Source={_channelScrapInfoDBPath}";
+    private string _enabledFeaturesConnectionString = $"Data Source={_enabledFeaturesDBPath}";
     private const string _dateTimeFormat = "yyyy-MM-dd HH:mm:ss";
 
     public DatabaseHelper()
     {
-    
+        if(string.IsNullOrWhiteSpace(_folderPath)) 
+            throw new Exception("DATABASE_PATH is not set");
+
         if (!Directory.Exists(_folderPath))
             Directory.CreateDirectory(_folderPath);
 
@@ -60,6 +64,11 @@ public class DatabaseHelper
         {
             lConnection.Open();
             CheckIfChannelScrapeInfoTableExists(lConnection);
+        }
+        using(var lConnection = new SqliteConnection(_enabledFeaturesConnectionString))
+        {
+            lConnection.Open();
+            CheckIfEnabledFeaturesTableExists(lConnection);
         }
     }
 
@@ -666,5 +675,55 @@ public class DatabaseHelper
             lGuilds.Add(ulong.Parse(lReader.GetString(0)));
 
         return lGuilds;        
+    }
+    private void CheckIfEnabledFeaturesTableExists(SqliteConnection aConnection)
+    {
+        string lTableCmd = @"CREATE TABLE IF NOT EXISTS EnabledFeatures(
+            GuildID TEXT NOT NULL,
+            Feature TEXT NOT NULL,
+            IsEnabled INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (GuildID, Feature)
+        )";
+        using var createCmd = new SqliteCommand(lTableCmd, aConnection);
+        createCmd.ExecuteNonQuery();
+    }
+    public bool? IsFeatureEnabled(ulong aGuildID, string aFeature)
+    {
+        using var lConnection = new SqliteConnection(_enabledFeaturesConnectionString);
+        lConnection.Open();
+
+        string lTableCmd = @"
+            SELECT IsEnabled
+            FROM EnabledFeatures
+            WHERE GuildID = $GuildID AND Feature = $Feature";
+
+        using var lCmd = new SqliteCommand(lTableCmd, lConnection);
+
+        lCmd.Parameters.AddWithValue("$GuildID", aGuildID.ToString());
+        lCmd.Parameters.AddWithValue("$Feature", aFeature);
+        using var lReader = lCmd.ExecuteReader();
+
+        if (!lReader.Read())
+            return null;
+
+        return lReader.GetInt32(0) == 1;
+    }
+    public void SetFeatureEnabled(ulong aGuildID, string aFeature, bool aEnabled)
+    {
+        using var lConnection = new SqliteConnection(_enabledFeaturesConnectionString);
+        lConnection.Open();
+
+        string lTableCmd = @"
+            INSERT INTO EnabledFeatures (GuildID, Feature, IsEnabled) 
+            VALUES ($GuildID, $Feature, $Enabled) 
+            ON CONFLICT (GuildID, Feature)
+            DO UPDATE SET
+                IsEnabled = excluded.IsEnabled";
+
+        using var lCmd = new SqliteCommand(lTableCmd, lConnection);
+        lCmd.Parameters.AddWithValue("$GuildID", aGuildID.ToString());
+        lCmd.Parameters.AddWithValue("$Feature", aFeature);
+        lCmd.Parameters.AddWithValue("$Enabled", aEnabled ? 1 : 0);
+        lCmd.ExecuteNonQuery();
     }
 }

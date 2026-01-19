@@ -84,7 +84,7 @@ public class MessagingService : IReminderNotifier
         string lGuildID = lChannel.GuildId!.Value.ToString();
 
         string? lWebHookID = _dbh.GetWebHookID(lGuildID, aChannelID.ToString());
-        string? lWebHookToken = _dbh.GetWebHookToken(lChannel.GuildId!.Value.ToString(), aChannelID.ToString());
+        string? lWebHookToken = _dbh.GetWebHookToken(lGuildID, aChannelID.ToString());
         DiscordWebhook? lWebHook;
         if (!string.IsNullOrEmpty(lWebHookID) && !string.IsNullOrEmpty(lWebHookToken))
         {

@@ -63,6 +63,7 @@ class Program
                 services.AddSingleton<IReminderService, ReminderService>();
                 services.AddSingleton<IChannelScraper, ChannelScraper>();
                 services.AddSingleton<IMotdPostingService, MotdService>();
+                services.AddSingleton<IFeatureGateService, FeatureGateService>();
 
                 services.AddHostedService<ReminderChecker>();
                 services.AddHostedService<MotdPoster>();
