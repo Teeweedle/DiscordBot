@@ -48,11 +48,10 @@ public class FeatureGateService : IFeatureGateService
     {
         if(await IsFeatureEnabledAsync(aContext.Guild.Id, aFeatureName))
             return true;
-
         await aContext.EditResponseAsync(new DiscordWebhookBuilder()
         .AddEmbed(new DiscordEmbedBuilder()
-            .WithTitle($"Feature `{aFeatureName}` is locked. It costs 💲💲💲 to unlock.")
-            .WithDescription("This feature costs money to run, so it is disabled by default.")
+            .WithTitle($"Feature `{aFeatureName}` is locked.")
+            .WithDescription("This feature costs 💵 💵 💵 to run, so it is disabled by default.")
             .WithColor(DiscordColor.Red)));
         return false;
     }

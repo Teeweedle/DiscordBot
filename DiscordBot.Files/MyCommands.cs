@@ -32,32 +32,44 @@ public class MyCommands : ApplicationCommandModule
     public async Task SetMOTDChannelCommand(InteractionContext ctx, [Option("channel", "Channel to set")] DiscordChannel aChannel)
     {
         var lDB = ctx.Services.GetRequiredService<DatabaseHelper>();
+        await ctx.CreateResponseAsync(
+            InteractionResponseType.DeferredChannelMessageWithSource,
+            new DiscordInteractionResponseBuilder().AsEphemeral(true)  
+        );
 
         if (!ctx.Member.Permissions.HasPermission(Permissions.Administrator))
         {
-            await ctx.CreateResponseAsync("You must be an admin to use this command.");
-            return;
+            await ctx.EditResponseAsync(new DiscordWebhookBuilder()
+                .WithContent("You must be an admin to use this command."));
+                return;
         }
  
         lDB.SetMotDChannel(ctx.Guild.Id.ToString(), aChannel.Id.ToString());
 
-        await ctx.CreateResponseAsync($"Set MotD channel to {aChannel.Name}");
+        await ctx.EditResponseAsync(new DiscordWebhookBuilder()
+            .WithContent($"Set MotD channel to {aChannel.Name}"));
     } 
     [SlashCommand("SetMotDWeightedChannel", "Sets the weighted channel messages in this channel are more likely to be picked.")]
     [SlashCommandPermissions(Permissions.Administrator)]
     public async Task SetMOTDWeightedChannelCommand(InteractionContext ctx, [Option("channel", "Channel to set")] DiscordChannel channel)
     {
         var ldb = ctx.Services.GetRequiredService<DatabaseHelper>();
+        await ctx.CreateResponseAsync(
+            InteractionResponseType.DeferredChannelMessageWithSource,
+            new DiscordInteractionResponseBuilder().AsEphemeral(true)  
+        );
 
         if (!ctx.Member.Permissions.HasPermission(Permissions.Administrator))
         {
-            await ctx.CreateResponseAsync("You must be an admin to use this command.");
-            return;
+            await ctx.EditResponseAsync(new DiscordWebhookBuilder()
+                .WithContent("You must be an admin to use this command."));
+                return;
         }
 
         ldb.SetWeightedChannel(ctx.Guild.Id.ToString(), channel.Id.ToString());
 
-        await ctx.CreateResponseAsync($"Set weighted channel to {channel.Name}");
+        await ctx.EditResponseAsync(new DiscordWebhookBuilder()
+            .WithContent($"Set weighted channel to {channel.Name}"));
     }
     [SlashCommand("GetCurrentWeightedChannel", "Get current MotD weighted channel.")]
     [SlashCommandPermissions(Permissions.Administrator)]
@@ -65,20 +77,28 @@ public class MyCommands : ApplicationCommandModule
     {
         var ldb = ctx.Services.GetRequiredService<DatabaseHelper>();
         ulong lGuildID = ctx.Guild.Id;
+
+        await ctx.CreateResponseAsync(
+            InteractionResponseType.DeferredChannelMessageWithSource,
+            new DiscordInteractionResponseBuilder().AsEphemeral(true)  
+        );
         if(ctx.Guild == null)
         {
-            await ctx.CreateResponseAsync("You must be in a guild to use this command.");
+            await ctx.EditResponseAsync(new DiscordWebhookBuilder()
+                .WithContent("You must be in a guild to use this command."));
             return;
         } 
         string? lChannelID = ldb.GetWeightedChannelID(lGuildID.ToString());
         if(string.IsNullOrEmpty(lChannelID))
         {
-            await ctx.CreateResponseAsync("No weighted channel set.");
+            await ctx.EditResponseAsync(new DiscordWebhookBuilder()
+                .WithContent("No weighted channel set."));
             return; 
         }    
         var channel = await ctx.Client.GetChannelAsync(ulong.Parse(lChannelID));
 
-        await ctx.CreateResponseAsync($"Current weighted channel is {channel?.Name}.");
+        await ctx.EditResponseAsync(new DiscordWebhookBuilder()
+            .WithContent($"Current weighted channel is {channel?.Name}."));
     }   
     [SlashCommand("TLDR", "Get a summary of the past 24 hours in the current channel.")]
     [SlashRequirePermissions(Permissions.SendMessages)]
@@ -107,13 +127,18 @@ public class MyCommands : ApplicationCommandModule
                             [Option("user", "User to set")] DiscordUser aUser, 
                             [Option("channel", "Channel to set")] DiscordChannel aChannel)
     {
+        await ctx.CreateResponseAsync(
+            InteractionResponseType.DeferredChannelMessageWithSource,
+            new DiscordInteractionResponseBuilder().AsEphemeral(true)
+        );
+
         if(!await _featureGateService.EnsureFeatureEnabledAsync(ctx, "AI"))
             return;
 
         if (!ctx.Member.Permissions.HasPermission(Permissions.Administrator))
         {
-            await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
-                new DiscordInteractionResponseBuilder().WithContent("You must be an admin to use this command."));         
+            await ctx.EditResponseAsync(new DiscordWebhookBuilder()
+                .WithContent("You must be an admin to use this command."));
             return;
         }
         try
@@ -121,13 +146,13 @@ public class MyCommands : ApplicationCommandModule
             var lDB = ctx.Services.GetRequiredService<DatabaseHelper>();
             lDB.SetTargetUserAndChannel(aUser.Id.ToString(), aChannel.Id.ToString(), ctx.Guild.Id.ToString() );
     
-            await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
-                new DiscordInteractionResponseBuilder().WithContent($"Set target to {aUser.Username} in {aChannel.Name}.")); 
+            await ctx.EditResponseAsync(new DiscordWebhookBuilder()
+                .WithContent($"Set target to {aUser.Username} in {aChannel.Name}."));
         }
         catch (Exception ex)
         {
-            await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
-                new DiscordInteractionResponseBuilder().WithContent($"[SetTarget Error] {ex.GetType().Name}: {ex.Message}"));
+            await ctx.EditResponseAsync(new DiscordWebhookBuilder()
+                .WithContent($"[SetTarget Error] {ex.GetType().Name}: {ex.Message}"));
         }       
     }
     [SlashCommand("PostMotD", "Posts the MotD for today in the channel you use this command in")]
@@ -136,15 +161,16 @@ public class MyCommands : ApplicationCommandModule
     {
         ulong lGuildID = ctx.Guild.Id;
         ulong lChannelID = ctx.Channel.Id;
-
+        await ctx.CreateResponseAsync(
+            InteractionResponseType.DeferredChannelMessageWithSource,
+            new DiscordInteractionResponseBuilder().AsEphemeral(true)
+        );
         if(!ctx.Member.Permissions.HasPermission(Permissions.Administrator))
         {
-            await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
-                new DiscordInteractionResponseBuilder().WithContent("You must be an admin to use this command."));
+            await ctx.EditResponseAsync(new DiscordWebhookBuilder()
+                .WithContent("You must be an admin to use this command."));
             return;
         }
-        await ctx.CreateResponseAsync(InteractionResponseType.DeferredChannelMessageWithSource,
-            new DiscordInteractionResponseBuilder().AsEphemeral(true));
 
         MessageRecord? lMotd = await _motdService.GetMotdAsync(DateTime.UtcNow, lGuildID);
 
@@ -167,7 +193,7 @@ public class MyCommands : ApplicationCommandModule
         {
             await ctx.EditResponseAsync(new DiscordWebhookBuilder()
                 .WithContent($"[PostMotD Error] {ex.GetType().Name}: {ex.Message}"));
-            throw;
+            return;
         }        
     }
     [SlashCommand("RemindMe", "Sets a custom reminder for you to be reminded of something in the future")]
@@ -194,7 +220,7 @@ public class MyCommands : ApplicationCommandModule
         {
             await ctx.EditResponseAsync(new DiscordWebhookBuilder()
                 .WithContent($"[RemindMe Error] {ex.GetType().Name}: {ex.Message}"));
-            throw;
+            return;
         }
     }
     [SlashCommand("Info", "Command and Channel info for this bot")]
