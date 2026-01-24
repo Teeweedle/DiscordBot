@@ -1,20 +1,24 @@
+using Microsoft.Extensions.Logging;
 
 public class ReminderService : IReminderService
 {
-    private DatabaseHelper _db;
+    private DatabaseHelper _dbh;
     private readonly IReminderNotifier _reminderNotifier;
     private readonly ReminderSignal _reminderSignal;
     private readonly Messaging _messaging;
+    private readonly ILogger<ReminderService> _logger;
     private List<ReminderRecord> _reminders = new List<ReminderRecord>();
     public ReminderService(DatabaseHelper aDb, 
                             IReminderNotifier aReminderNotifier, 
                             ReminderSignal aReminderSignal, 
-                            Messaging aMessaging)
+                            Messaging aMessaging,
+                            ILogger<ReminderService> aLogger)
     {
-        _db = aDb;
+        _dbh = aDb;
         _reminderNotifier = aReminderNotifier;
         _reminderSignal = aReminderSignal;
         _messaging = aMessaging;
+        _logger = aLogger;
     }
     public async Task CreateReminder(ulong aUserID, ulong aGuildID, long aAmount, string aDuration, string aMessage, ulong aInteractionID)
     {
@@ -28,7 +32,7 @@ public class ReminderService : IReminderService
             Message = aMessage,
             InteractionID = aInteractionID
         };
-        _db.SaveRemindMe(lReminder);
+        _dbh.SaveRemindMe(lReminder);
         if(ShouldTrackReminder(lReminder.ExpirationDate))
         {
             TrackExpiringReminder(lReminder);
@@ -54,7 +58,7 @@ public class ReminderService : IReminderService
     }
     public void LoadExpiringReminderList()
     {
-        _reminders = _db.GetExpiringReminders();
+        _reminders = _dbh.GetExpiringReminders();
     }
     public TimeSpan GetNextReminderInterval()
     {    
@@ -80,12 +84,18 @@ public class ReminderService : IReminderService
     private void DeleteReminder(ReminderRecord aReminder)
     {
         _reminders.Remove(aReminder);//Check if right
-        _db.RemoveRemindMe(aReminder.InteractionID);
+        _dbh.RemoveRemindMe(aReminder.InteractionID);
     } 
     private void TrackExpiringReminder(ReminderRecord aReminder)
     {
         _reminders.Add(aReminder);
         //sort list by earliest date first
         _reminders.Sort((a, b) => a.ExpirationDate.CompareTo(b.ExpirationDate));
+    }
+
+    public async Task PurgeGuildRemindersAsync(ulong aGuildID)
+    {
+        int lRemindersPurged = await _dbh.PurgeGuildReminders(aGuildID);
+        _logger.LogInformation($"Purged {lRemindersPurged} reminders from guild {aGuildID}");
     }
 }

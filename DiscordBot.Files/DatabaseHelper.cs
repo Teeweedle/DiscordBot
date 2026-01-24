@@ -1,4 +1,5 @@
 using System.Globalization;
+using Cohere;
 using DSharpPlus.Entities;
 using Microsoft.Data.Sqlite;
 public class DatabaseHelper
@@ -725,5 +726,83 @@ public class DatabaseHelper
         lCmd.Parameters.AddWithValue("$Feature", aFeature);
         lCmd.Parameters.AddWithValue("$Enabled", aEnabled ? 1 : 0);
         lCmd.ExecuteNonQuery();
+    }
+    public async Task<int> PurgeGuildMessages(ulong aGuildID)
+    {
+        using var lConnection = new SqliteConnection(_messagesConnectionString);
+        lConnection.Open();
+
+        string lTableCmd = @"
+            DELETE FROM Messages
+            WHERE GuildID = $GuildID";
+
+        using var lCmd = new SqliteCommand(lTableCmd, lConnection);
+        lCmd.Parameters.AddWithValue("$GuildID", aGuildID.ToString());
+        return await lCmd.ExecuteNonQueryAsync();
+    }
+    public async Task<int> PurgeGuildReminders(ulong aGuildID)
+    {
+        using var lConnection = new SqliteConnection(_remindMeConnectionString);
+        lConnection.Open();
+
+        string lTableCmd = @"
+            DELETE FROM Reminders
+            WHERE GuildID = $GuildID";
+
+        using var lCmd = new SqliteCommand(lTableCmd, lConnection);
+        lCmd.Parameters.AddWithValue("$GuildID", aGuildID.ToString());
+        return await lCmd.ExecuteNonQueryAsync();
+    }
+    public async Task<int> PurgeGuildFeatures(ulong aGuildID)
+    {
+        using var lConnection = new SqliteConnection(_enabledFeaturesConnectionString);
+        lConnection.Open();
+
+        string lTableCmd = @"
+            DELETE FROM EnabledFeatures
+            WHERE GuildID = $GuildID";
+
+        using var lCmd = new SqliteCommand(lTableCmd, lConnection);
+        lCmd.Parameters.AddWithValue("$GuildID", aGuildID.ToString());
+        return await lCmd.ExecuteNonQueryAsync();
+    }
+    public async Task<int> PurgeGuildMotdSettings(ulong aGuildID)
+    {
+        using var lConnection = new SqliteConnection(_motdSettingsConnectionString);
+        lConnection.Open();
+
+        string lTableCmd = @"
+            DELETE FROM MotdSettings
+            WHERE GuildID = $GuildID";
+
+        using var lCmd = new SqliteCommand(lTableCmd, lConnection);
+        lCmd.Parameters.AddWithValue("$GuildID", aGuildID.ToString());
+        return await lCmd.ExecuteNonQueryAsync();
+    }
+    public async Task<int> PurgeGuildTargetUserAndChannel(ulong aGuildID)
+    {
+        using var lConnection = new SqliteConnection(_targetUserAndChannelConnectionString);
+        lConnection.Open();
+
+        string lTableCmd = @"
+            DELETE FROM TargetUserAndChannel
+            WHERE GuildID = $GuildID";
+
+        using var lCmd = new SqliteCommand(lTableCmd, lConnection);
+        lCmd.Parameters.AddWithValue("$GuildID", aGuildID.ToString());
+        return await lCmd.ExecuteNonQueryAsync();
+    }
+    public async Task<int> PurgeGuildWebHookInfo(ulong aGuildID)
+    {
+        using var lConnection = new SqliteConnection(_webhookInfoConnectionString);
+        lConnection.Open();
+
+        string lTableCmd = @"
+            DELETE FROM WebHookInfo
+            WHERE GuildID = $GuildID";
+
+        using var lCmd = new SqliteCommand(lTableCmd, lConnection);
+        lCmd.Parameters.AddWithValue("$GuildID", aGuildID.ToString());
+        return await lCmd.ExecuteNonQueryAsync();
     }
 }

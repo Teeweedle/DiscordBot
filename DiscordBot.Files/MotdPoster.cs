@@ -2,15 +2,15 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 public class MotdPoster : BackgroundService
 {
-    private readonly IMotdPostingService _motdService;
-    private readonly MessagingService _messagingService;
+    private readonly IMotdPostingService _motdPostingService;
+    private readonly IMessagingService _messagingService;
     private readonly ILogger<MotdPoster> _logger;
 
-    public MotdPoster(IMotdPostingService aMotdService, 
-                    MessagingService aMessagingService, 
+    public MotdPoster(IMotdPostingService aMotdPostingService, 
+                    IMessagingService aMessagingService, 
                     ILogger<MotdPoster> aLogger)
     {
-        _motdService = aMotdService;
+        _motdPostingService = aMotdPostingService;
         _messagingService = aMessagingService;
         _logger = aLogger;
     }
@@ -33,28 +33,28 @@ public class MotdPoster : BackgroundService
     
                 DateTime lToday = DateTime.UtcNow.Date;
     
-                List<ulong> lGuildsDueForMotdPosting = await _motdService.GetGuildsDueForMotdPostingAsync(lToday);
+                List<ulong> lGuildsDueForMotdPosting = await _motdPostingService.GetGuildsDueForMotdPostingAsync(lToday);
     
                 foreach (var guildID in lGuildsDueForMotdPosting)
                 {
                     try
                     {
-                        ulong lMotdChannelID = await _motdService.GetMotdChannelID(guildID);
+                        ulong lMotdChannelID = await _motdPostingService.GetMotdChannelID(guildID);
                         if(lMotdChannelID == 0)//motd channel not set
                         {
                             await _messagingService.SendMissingMotdChannelAsync(guildID);
                             continue;
                         }
         
-                        MessageRecord? lMotd = await _motdService.GetMotdAsync(lToday, guildID);
+                        MessageRecord? lMotd = await _motdPostingService.GetMotdAsync(lToday, guildID);
         
                         if(lMotd != null)
                         {
-                            await _motdService.SendMotdAsync(lMotd, lMotdChannelID);
+                            await _motdPostingService.SendMotdAsync(lMotd, lMotdChannelID);
                         }else
                         {
                             await _messagingService.SendNoMotdFoundAsync(lMotdChannelID);
-                            await _motdService.SetLastMotdDate(DateTime.UtcNow, guildID);
+                            await _motdPostingService.SetLastMotdDate(DateTime.UtcNow, guildID);
                         } 
                     }
                     catch (Exception ex)

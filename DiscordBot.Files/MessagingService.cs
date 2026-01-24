@@ -3,7 +3,7 @@ using DSharpPlus.Entities;
 using DSharpPlus.EventArgs;
 using Microsoft.Extensions.Logging;
 
-public class MessagingService : IReminderNotifier
+public class MessagingService : IReminderNotifier, IMessagingService
 {
     private readonly DiscordClient _discord;
     private readonly DatabaseHelper _dbh;
@@ -135,5 +135,21 @@ public class MessagingService : IReminderNotifier
     public Task SendReminderAsync(ReminderRecord aReminderRecord)
     {
         throw new NotImplementedException();
+    }
+
+    public async Task PurgeGuildMessagesAsync(ulong aGuildID)
+    {
+        int lMessagesPurged = await _dbh.PurgeGuildMessages(aGuildID);
+        _logger.LogInformation($"Purged {lMessagesPurged} messages from guild {aGuildID}");
+    }
+    public async Task PurgeGuildWebHooksAsync(ulong aGuildID)
+    {
+        int lWebHooksPurged = await _dbh.PurgeGuildWebHookInfo(aGuildID);
+        _logger.LogInformation($"Purged {lWebHooksPurged} webhooks from guild {aGuildID}");
+    }
+    public async Task PurgeGuildTargetUserAndChannelsAsync(ulong aGuildID)
+    {
+        int lTargetUserAndChannelsPurged = await _dbh.PurgeGuildTargetUserAndChannel(aGuildID);
+        _logger.LogInformation($"Purged {lTargetUserAndChannelsPurged} target user and channels from guild {aGuildID}");
     }
 }

@@ -1,19 +1,19 @@
 using Microsoft.Extensions.Logging;
 
-public sealed class MotdService : IMotdPostingService
+public sealed class MotdService : IMotdPostingService, IMotdService
 {
     private readonly DatabaseHelper _dbh;
     private readonly DiscordLookupService _lookup;
-    private readonly MessagingService _messaging;
+    private readonly IMessagingService _messagingService;
     private readonly ILogger<MotdService> _logger;
     public MotdService(DatabaseHelper aDb, 
                         DiscordLookupService aLookup, 
-                        MessagingService aMessagingService, 
+                        IMessagingService aMessagingService, 
                         ILogger<MotdService> aLogger)
     {
         _dbh = aDb;
         _lookup = aLookup;
-        _messaging = aMessagingService;
+        _messagingService = aMessagingService;
         _logger = aLogger;
     }
     /// <summary>
@@ -162,7 +162,7 @@ public sealed class MotdService : IMotdPostingService
     }
     public async Task SendMotdAsync(MessageRecord aMessageRecord, ulong aChannelID)
     {
-        await _messaging.PostMotdAsync(aMessageRecord, aChannelID); 
+        await _messagingService.PostMotdAsync(aMessageRecord, aChannelID); 
         
         await SetLastMotdDate(DateTime.UtcNow, ulong.Parse(aMessageRecord.GuildID.ToString())); 
     }
@@ -174,4 +174,10 @@ public sealed class MotdService : IMotdPostingService
         _dbh.SetLastMotdDate(lEstDate, aGuildID);    
     }
     public async Task<List<ulong>> GetGuildsDueForMotdPostingAsync(DateTime aToday) => _dbh.GetGuildsDueForMotdPosting(aToday);
+
+    public async Task PurgeGuildMotdSettingsAsync(ulong aGuildID)
+    {
+        int lSettingsPurged = await _dbh.PurgeGuildMotdSettings(aGuildID);
+        _logger.LogInformation($"Purged {lSettingsPurged} motd settings from guild {aGuildID}");
+    }
 }

@@ -7,15 +7,15 @@ using Microsoft.Extensions.DependencyInjection;
 
 public class MyCommands : ApplicationCommandModule
 {   
-    private readonly MessagingService _messagingService;
+    private readonly IMessagingService _messagingService;
     private readonly IReminderService _reminderService;
     private readonly IFeatureGateService _featureGateService;
-    private readonly MotdService _motdService;
+    private readonly IMotdService _motdService;
     private readonly ChannelSummaryService _channelSummaryService;
     private readonly BotInfoService _botInfoService;
-    public MyCommands(MessagingService aMessagingService,
+    public MyCommands(IMessagingService aMessagingService,
                     IReminderService aReminderService, 
-                    MotdService aMotdService, 
+                    IMotdService aMotdService, 
                     ChannelSummaryService aChannelSummaryService,
                     BotInfoService aBotInfoService,
                     IFeatureGateService aFeatureGateService)

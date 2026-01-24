@@ -1,10 +1,12 @@
 
 using DSharpPlus.Entities;
 using DSharpPlus.SlashCommands;
+using Microsoft.Extensions.Logging;
 
 public class FeatureGateService : IFeatureGateService
 {
     private readonly DatabaseHelper _dbh;
+    private readonly ILogger<FeatureGateService> _logger;
     private static readonly Dictionary<string, FeatureDefaults> _defaults = new()
     {
         ["AI"] = new FeatureDefaults
@@ -16,9 +18,11 @@ public class FeatureGateService : IFeatureGateService
             EnabledByDefault = true
         }
     };
-    public FeatureGateService(DatabaseHelper adbh)
+    public FeatureGateService(DatabaseHelper adbh,
+                                ILogger<FeatureGateService> aLogger)
     {
         _dbh = adbh;
+        _logger = aLogger;
     }
 
     /// <summary>
@@ -54,5 +58,11 @@ public class FeatureGateService : IFeatureGateService
             .WithDescription("This feature costs 💵 💵 💵 to run, so it is disabled by default.")
             .WithColor(DiscordColor.Red)));
         return false;
+    }
+
+    public async Task PurgeGuildFeaturesAsync(ulong aGuildID)
+    {
+        int lFeaturesPurged = await _dbh.PurgeGuildFeatures(aGuildID);
+        _logger.LogInformation($"Purged {lFeaturesPurged} features from guild {aGuildID}");
     }
 }

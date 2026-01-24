@@ -1,12 +1,11 @@
-
 public sealed class BotInfoService
 {
     private readonly DatabaseHelper _dbh;
     private readonly DiscordLookupService _lookup;
-    private readonly MotdService _motdService;
+    private readonly IMotdService _motdService;
     public BotInfoService(DatabaseHelper aDb, 
                         DiscordLookupService aLookup, 
-                        MotdService aMotdService)
+                        IMotdService aMotdService)
     {
         _dbh = aDb;
         _lookup = aLookup;

@@ -50,20 +50,20 @@ class Program
                     var logger = provider.GetRequiredService<ILogger<CohereClient>>();
                     return new CohereClient(apiKey, logger);
                 });
-                services.AddSingleton<MessagingService>();
                 services.AddSingleton<Messaging>();
                 services.AddSingleton<ReminderSignal>();
-                services.AddSingleton<MotdService>();
                 services.AddSingleton<ChannelSummaryService>();
                 services.AddSingleton<ConversationResponse>();
                 services.AddSingleton<BotInfoService>();
                 services.AddSingleton<DiscordLookupService>();
-                services.AddSingleton<ReminderService>();
+                services.AddSingleton<IMessagingService, MessagingService>();
                 services.AddSingleton<IReminderNotifier, MessagingService>();
                 services.AddSingleton<IReminderService, ReminderService>();
                 services.AddSingleton<IChannelScraper, ChannelScraper>();
                 services.AddSingleton<IMotdPostingService, MotdService>();
                 services.AddSingleton<IFeatureGateService, FeatureGateService>();
+                services.AddSingleton<IGuildDataManager, GuildDataManager>();
+                services.AddSingleton<IMotdService, MotdService>();
 
                 services.AddHostedService<ReminderChecker>();
                 services.AddHostedService<MotdPoster>();
