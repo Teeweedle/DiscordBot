@@ -26,13 +26,17 @@ class Program
             })
             .ConfigureServices((context, services) =>
             {
-                string? token = Environment.GetEnvironmentVariable("DISCORD_BOT_TOKEN");
-                if (string.IsNullOrWhiteSpace(token))
-                    throw new Exception("DISCORD_BOT_TOKEN is not set");
+                var lEnv = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
+
+                string? lToken = lEnv == "Development" 
+                    ? Environment.GetEnvironmentVariable("DISCORD_BOT_TOKEN_DEV") 
+                    : Environment.GetEnvironmentVariable("DISCORD_BOT_TOKEN");
+                if (string.IsNullOrWhiteSpace(lToken))
+                    throw new Exception("DISCORD_BOT_TOKEN is not set for current environment.");
 
                 services.AddSingleton(new DiscordClient(new DiscordConfiguration
                 {
-                    Token = token,
+                    Token = lToken,
                     TokenType = TokenType.Bot,
                     Intents = DiscordIntents.Guilds | 
                             DiscordIntents.GuildMessages |
