@@ -27,6 +27,12 @@ public class BotService : BackgroundService
         _guildDataManager = aGuildDataManager;
 
         _discord.GuildDeleted += OnGuildDeletedAsync;
+        _discord.GuildMemberRemoved += OnGuildMemberRemovedAsync;
+    }
+
+    private async Task OnGuildMemberRemovedAsync(DiscordClient sender, GuildMemberRemoveEventArgs args)
+    {
+        await _guildDataManager.PurgeUserDataAsync(args.Member.Id, args.Guild.Id);
     }
 
     private async Task OnGuildDeletedAsync(DiscordClient sender, GuildDeleteEventArgs args)

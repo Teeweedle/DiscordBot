@@ -25,16 +25,24 @@ public class GuildDataManager : IGuildDataManager
     {
         _logger.LogInformation($"Purging guild {aGuildID} data...", aGuildID);
         await Task.WhenAll(
-            SafeExecuteAsync(() => _messagingService.PurgeGuildMessagesAsync(aGuildID), "messages", aGuildID),
-            SafeExecuteAsync(() => _messagingService.PurgeGuildWebHooksAsync(aGuildID), "webhooks", aGuildID),
-            SafeExecuteAsync(() => _messagingService.PurgeGuildTargetUserAndChannelsAsync(aGuildID), "target user/channels", aGuildID),
-            SafeExecuteAsync(() => _motdService.PurgeGuildMotdSettingsAsync(aGuildID), "motd settings", aGuildID),
-            SafeExecuteAsync(() => _reminderService.PurgeGuildRemindersAsync(aGuildID), "reminders", aGuildID),
-            SafeExecuteAsync(() => _featureGateService.PurgeGuildFeaturesAsync(aGuildID), "features", aGuildID)
+            SafeExecuteAsync(() => _messagingService.PurgeGuildMessagesAsync(aGuildID), $"messages in guild {aGuildID}"),
+            SafeExecuteAsync(() => _messagingService.PurgeGuildWebHooksAsync(aGuildID), $"webhooks in guild {aGuildID}"),
+            SafeExecuteAsync(() => _messagingService.PurgeGuildTargetUserAndChannelsAsync(aGuildID), $"target user/channels in guild {aGuildID}"),
+            SafeExecuteAsync(() => _motdService.PurgeGuildMotdSettingsAsync(aGuildID), $"motd settings in guild {aGuildID}"),
+            SafeExecuteAsync(() => _reminderService.PurgeGuildRemindersAsync(aGuildID), $"reminders in guild {aGuildID}"),
+            SafeExecuteAsync(() => _featureGateService.PurgeGuildFeaturesAsync(aGuildID), $"features in guild {aGuildID}")
         );
         _logger.LogInformation($"Purged of guild {aGuildID} data complete.", aGuildID);        
     }
-    private async Task SafeExecuteAsync(Func<Task> aAction,  string aActionName, ulong aGuildID)
+    public async Task PurgeUserDataAsync(ulong aUserID, ulong aGuildID)
+    {
+        _logger.LogInformation($"Purging user {aUserID} data...", aUserID);
+        await Task.WhenAll(
+            SafeExecuteAsync(() => _reminderService.PurgeUserRemindersAsync(aUserID, aGuildID), $"reminders for User {aUserID} in guild {aGuildID}")
+        );
+        _logger.LogInformation($"Purge of user {aUserID} data complete.", aUserID);
+    }
+    private async Task SafeExecuteAsync(Func<Task> aAction,  string aActionName)
     {
         try
         {
@@ -42,7 +50,7 @@ public class GuildDataManager : IGuildDataManager
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to purge {ActionName} for guild {GuildID}", aActionName, aGuildID);
+            _logger.LogError(ex, "Failed to purge {ActionName}", aActionName);
         }
     }
 }

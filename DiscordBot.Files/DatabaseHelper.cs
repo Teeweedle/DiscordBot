@@ -753,6 +753,20 @@ public class DatabaseHelper
         lCmd.Parameters.AddWithValue("$GuildID", aGuildID.ToString());
         return await lCmd.ExecuteNonQueryAsync();
     }
+    public async Task<int> PurgeUserReminders(ulong aGuildID, ulong aMemberID)
+    {
+        using var lConnection = new SqliteConnection(_remindMeConnectionString);
+        lConnection.Open();
+
+        string lTableCmd = @"
+            DELETE FROM Reminders
+            WHERE GuildID = $GuildID AND MemberID = $MemberID";
+
+        using var lCmd = new SqliteCommand(lTableCmd, lConnection);
+        lCmd.Parameters.AddWithValue("$GuildID", aGuildID.ToString());
+        lCmd.Parameters.AddWithValue("$MemberID", aMemberID.ToString());
+        return await lCmd.ExecuteNonQueryAsync();
+    }
     public async Task<int> PurgeGuildFeatures(ulong aGuildID)
     {
         using var lConnection = new SqliteConnection(_enabledFeaturesConnectionString);

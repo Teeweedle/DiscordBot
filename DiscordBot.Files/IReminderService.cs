@@ -5,4 +5,5 @@ public interface IReminderService
     TimeSpan GetNextReminderInterval();
     Task CheckForExpiredReminders();
     Task PurgeGuildRemindersAsync(ulong aGuildID);
+    Task PurgeUserRemindersAsync(ulong aUserID, ulong aGuildID);
 }

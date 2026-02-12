@@ -98,4 +98,9 @@ public class ReminderService : IReminderService
         int lRemindersPurged = await _dbh.PurgeGuildReminders(aGuildID);
         _logger.LogInformation($"Purged {lRemindersPurged} reminders from guild {aGuildID}");
     }
+    public async Task PurgeUserRemindersAsync(ulong aUserID, ulong aGuildID)
+    {
+        int lRemindersPurged = await _dbh.PurgeUserReminders(aUserID, aGuildID);
+        _logger.LogInformation($"Purged {lRemindersPurged} reminders from user {aUserID} in guild {aGuildID}");
+    }
 }
