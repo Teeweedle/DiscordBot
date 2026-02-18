@@ -8,6 +8,7 @@ public class BotService : BackgroundService
 {
     private readonly DiscordClient _discord;
     private readonly IServiceProvider _services;
+    private readonly MessagingService _messageService;
     private readonly IChannelScraper _channelScraper;
     private static ulong _guildID = 429063504725671947;
     private readonly ILogger<BotService> _logger;
@@ -17,7 +18,8 @@ public class BotService : BackgroundService
                     IServiceProvider aServices, 
                     IChannelScraper aChannelScraper,
                     ILogger<BotService> aLogger,
-                    IGuildDataManager aGuildDataManager)
+                    IGuildDataManager aGuildDataManager,
+                    MessagingService aMessagingService)
     {        
         _discord = aDiscord;
         _services = aServices;
@@ -25,9 +27,23 @@ public class BotService : BackgroundService
         //start the channel scraper
         _channelScraper = aChannelScraper;
         _guildDataManager = aGuildDataManager;
+        _messageService = aMessagingService;
 
         _discord.GuildDeleted += OnGuildDeletedAsync;
         _discord.GuildMemberRemoved += OnGuildMemberRemovedAsync;
+        _discord.MessageCreated += OnMessageCreatedAsync;
+        _discord.MessageDeleted += OnMessageDeletedAsync;
+        // _discord.MessageUpdated += OnMessageUpdatedAsync;
+    }
+
+    private async Task OnMessageDeletedAsync(DiscordClient sender, MessageDeleteEventArgs args)
+    {
+        await _messageService.OnMessageDeletedAsync(args);
+    }
+
+    private async Task OnMessageCreatedAsync(DiscordClient sender, MessageCreateEventArgs args)
+    {
+        await _messageService.OnMessageCreatedAsync(args);
     }
 
     private async Task OnGuildMemberRemovedAsync(DiscordClient sender, GuildMemberRemoveEventArgs args)

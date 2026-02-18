@@ -2,6 +2,7 @@ using DSharpPlus;
 using DSharpPlus.Entities;
 using DSharpPlus.EventArgs;
 using Microsoft.Extensions.Logging;
+using SQLitePCL;
 
 public class MessagingService : IReminderNotifier, IMessagingService
 {
@@ -22,10 +23,14 @@ public class MessagingService : IReminderNotifier, IMessagingService
         _messaging = aMessaging;
         _conversation = aConversation;
         _logger = aLogger;
-
-        _discord.MessageCreated += OnMessageCreatedAsync;
     }
-    public async Task OnMessageCreatedAsync(DiscordClient sender, MessageCreateEventArgs e) 
+
+    public async Task OnMessageDeletedAsync(MessageDeleteEventArgs e)
+    {
+        await _dbh.DeleteMessage(e.Guild.Id, e.Message.Id);
+    }
+
+    public async Task OnMessageCreatedAsync(MessageCreateEventArgs e) 
     {
         if (!e.Author.IsBot)
             _dbh.SaveMessage(e.Message);

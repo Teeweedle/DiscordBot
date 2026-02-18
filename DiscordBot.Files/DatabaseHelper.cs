@@ -1,5 +1,6 @@
 using System.Globalization;
 using Cohere;
+using Cohere.JsonConverters;
 using DSharpPlus.Entities;
 using Microsoft.Data.Sqlite;
 public class DatabaseHelper
@@ -817,6 +818,20 @@ public class DatabaseHelper
 
         using var lCmd = new SqliteCommand(lTableCmd, lConnection);
         lCmd.Parameters.AddWithValue("$GuildID", aGuildID.ToString());
+        return await lCmd.ExecuteNonQueryAsync();
+    }
+    public async Task<int> DeleteMessage(ulong aGuildID, ulong aMessageID)
+    {
+        using var lConnection = new SqliteConnection(_messagesConnectionString);
+        lConnection.Open();
+
+        string lTableCmd = @"
+            DELETE FROM Messages
+            WHERE GuildID = $GuildID AND MessageID = $MessageID";
+
+        using var lCmd = new SqliteCommand(lTableCmd, lConnection);
+        lCmd.Parameters.AddWithValue("$GuildID", aGuildID.ToString());
+        lCmd.Parameters.AddWithValue("$MessageID", aMessageID.ToString());
         return await lCmd.ExecuteNonQueryAsync();
     }
 }
