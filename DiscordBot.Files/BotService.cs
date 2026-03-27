@@ -33,9 +33,18 @@ public class BotService : BackgroundService
         _discord.GuildMemberRemoved += OnGuildMemberRemovedAsync;
         _discord.MessageCreated += OnMessageCreatedAsync;
         _discord.MessageDeleted += OnMessageDeletedAsync;
+        _discord.MessageReactionAdded += OnMessageReactionAddedAsync;
+        _discord.MessageReactionRemoved += OnMessageReactionRemovedAsync;
         // _discord.MessageUpdated += OnMessageUpdatedAsync;
     }
-
+    private async Task OnMessageReactionAddedAsync(DiscordClient sender, MessageReactionAddEventArgs args)
+    {
+        await _messageService.OnMessageReactionAddedAsync(args);
+    }
+    private async Task OnMessageReactionRemovedAsync(DiscordClient sender, MessageReactionRemoveEventArgs args)
+    {
+        await _messageService.OnMessageReactionRemovedAsync(args);
+    }
     private async Task OnMessageDeletedAsync(DiscordClient sender, MessageDeleteEventArgs args)
     {
         await _messageService.OnMessageDeletedAsync(args);

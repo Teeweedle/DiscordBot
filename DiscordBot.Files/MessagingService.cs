@@ -24,7 +24,14 @@ public class MessagingService : IReminderNotifier, IMessagingService
         _conversation = aConversation;
         _logger = aLogger;
     }
-
+    public async Task OnMessageReactionAddedAsync(MessageReactionAddEventArgs e)
+    {
+        await _dbh.SaveMessageReaction(e.Guild.Id, e.Message.Id);
+    }
+    public async Task OnMessageReactionRemovedAsync(MessageReactionRemoveEventArgs e)
+    {
+        await _dbh.DeleteMessageReaction(e.Guild.Id, e.Message.Id);
+    }
     public async Task OnMessageDeletedAsync(MessageDeleteEventArgs e)
     {
         await _dbh.DeleteMessage(e.Guild.Id, e.Message.Id);

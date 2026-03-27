@@ -834,4 +834,19 @@ public class DatabaseHelper
         lCmd.Parameters.AddWithValue("$MessageID", aMessageID.ToString());
         return await lCmd.ExecuteNonQueryAsync();
     }
+    public async Task<int> SaveMessageReaction(ulong aGuildID, ulong aMessageID)
+    {
+        using var lConnection = new SqliteConnection(_messagesConnectionString);
+        lConnection.Open();
+
+        string lTableCmd = @"
+            UPDATE Messages
+            SET Reactions = Reactions + 1
+            WHERE GuildID = $GuildID AND MessageID = $MessageID";
+
+        using var lCmd = new SqliteCommand(lTableCmd, lConnection);
+        lCmd.Parameters.AddWithValue("$GuildID", aGuildID.ToString());
+        lCmd.Parameters.AddWithValue("$MessageID", aMessageID.ToString());
+        return await lCmd.ExecuteNonQueryAsync();
+    }
 }
