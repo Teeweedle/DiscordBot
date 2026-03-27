@@ -841,7 +841,22 @@ public class DatabaseHelper
 
         string lTableCmd = @"
             UPDATE Messages
-            SET Reactions = Reactions + 1
+            SET ReactionCount = ReactionCount + 1
+            WHERE GuildID = $GuildID AND MessageID = $MessageID";
+
+        using var lCmd = new SqliteCommand(lTableCmd, lConnection);
+        lCmd.Parameters.AddWithValue("$GuildID", aGuildID.ToString());
+        lCmd.Parameters.AddWithValue("$MessageID", aMessageID.ToString());
+        return await lCmd.ExecuteNonQueryAsync();
+    }
+    public async Task<int> DeleteMessageReaction(ulong aGuildID, ulong aMessageID)
+    {
+        using var lConnection = new SqliteConnection(_messagesConnectionString);
+        lConnection.Open();
+
+        string lTableCmd = @"
+            UPDATE Messages
+            SET ReactionCount = MAX(ReactionCount - 1, 0)
             WHERE GuildID = $GuildID AND MessageID = $MessageID";
 
         using var lCmd = new SqliteCommand(lTableCmd, lConnection);
